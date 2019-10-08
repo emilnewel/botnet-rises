@@ -207,7 +207,9 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds,
   }
   else
   {
-      std::cout << "Unknown command from client:" << buffer << std::endl;
+      std::string msg = "Command " + buffer + "has not yet been implemented, check back later :) ";
+      send(clientSocket, msg.c_str(), msg.length()-1, 0);
+      std::cout << "Unknown command from connection:" << buffer << std::endl;
   }
 }
 
