@@ -56,7 +56,7 @@ void listenServer(int serverSocket)
 int main(int argc, char* argv[])
 {
    struct addrinfo hints, *svr;              // Network host entry for server
-   struct sockaddr_in serv_addr;           // Socket address for server
+   struct sockaddr_in serv_addr;             // Socket address for server
    int serverSocket;                         // Socket used for server 
    int nwrite;                               // No. bytes written to server
    char buffer[1025];                        // buffer for writing to server
@@ -70,7 +70,7 @@ int main(int argc, char* argv[])
         exit(0);
    }
 
-   hints.ai_family   = AF_INET;            // IPv4 only addresses
+   hints.ai_family   = AF_INET;              // IPv4 only addresses
    hints.ai_socktype = SOCK_STREAM;
 
    memset(&hints,   0, sizeof(hints));
