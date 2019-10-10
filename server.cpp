@@ -134,20 +134,16 @@ int open_socket(int portno)
 void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
 {
     // Remove client from the clients list
-    clients.erase(clientSocket);
-
     // If this client's socket is maxfds then the next lowest
     // one has to be determined. Socket fd's can be reused by the Kernel,
     // so there aren't any nice ways to do this.
-
     if (*maxfds == clientSocket)
     {
         for (auto const &p : clients)
         {
-            *maxfds = std::max(*maxfds, p.second->sock);
+            *maxfds = std::max(*maxfds, p.second->sock);   
         }
     }
-
     // And remove from the list of open sockets.
 
     FD_CLR(clientSocket, openSockets);
@@ -204,9 +200,29 @@ void SEND_MSG(std::string groupName, std::string msg)
         }
     }
 }
-void LEAVE()
+
+void LEAVE(std::string port, fd_set *openSockets, int *maxfds)
 {
-    //close(user->sock);
+    for(const auto &c : clients)
+    {
+        std::cout << "PORT: " << port << " CLIENT SOCK: " << c.second->port << std::endl;
+        std::cout << *maxfds;
+        if(c.second->port == port)
+        {
+            Client *cl = c.second;
+            //clients.erase(cl->sock);   
+            if (*maxfds == cl->sock)
+            {
+                std::cout << "hello from if" << std::endl; 
+                for (auto const &p : clients)
+                {
+                    std::cout << "hello from for" << std::endl;
+                    *maxfds = std::max(*maxfds, p.second->sock);   
+                }   
+            }
+             
+        }
+    }
 
 }
 void STATUSREQ()
@@ -222,10 +238,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     std::string token;
     char msg[1000];
 
-    // Split command from client into tokens for parsing
     std::stringstream stream(buffer);
-
-    while (stream >> token)
     {
         tokens.push_back(token);
     }
@@ -267,7 +280,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     else if (tokens[0].compare("LEAVE") == 0)
     {
         //TODO: IMPLEMENT
-        //LEAVE(clients);
+        LEAVE(tokens[2], openSockets, maxfds);
     }
     else if (tokens[0].compare("STATUSREQ") == 0)
     {
