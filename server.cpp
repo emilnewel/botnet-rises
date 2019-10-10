@@ -45,8 +45,14 @@ class Client
 public:
     int sock;         // socket of client connection
     std::string name; // Limit length of name of client's user
-
-    Client(int socket) : sock(socket) {}
+    int port;
+    std::string listServers;
+    bool isClient;
+    
+    Client(int socket){
+        this->sock = socket;
+        port = 0;
+    }
 
     ~Client() {} // Virtual destructor defined for base class
 };
@@ -146,8 +152,7 @@ void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
 
 // Process command from client on the server
 
-void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds,
-                   char *buffer)
+void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buffer, Client* client)
 {
     std::vector<std::string> tokens;
     std::string token;
@@ -159,14 +164,22 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds,
         tokens.push_back(token);
     }
         
-    
-    if (tokens[0].compare("CONNECT") == 0)// && token.size() == 3)
-    {
+    std::cout << tokens[0] << std::endl;
+    if (tokens[0].compare("CONNECT") == 0 && token.size() == 3)
+    {   
         std::cout << tokens[1] << ":" << tokens[2] << std::endl;
+        struct sockaddr_in sk_addr;
+        sk_addr.sin_family      = AF_INET;
+        sk_addr.sin_addr.s_addr = INADDR_ANY;
+        sk_addr.sin_port        = htons(stoi(tokens[2]));
+
+        if (connect(clientSocket, (struct sockaddr *)&sk_addr, sizeof(sk_addr)) < 0) 
+        { 
+            printf("\nConnection Failed \n");  
+        } 
     }
     else if (tokens[0].compare("LISTSERVERS") == 0)
     {
-
         for (auto it = clients.cbegin(); it != clients.cend(); ++it)
         {
             if (clientSocket == it->first)
@@ -216,6 +229,8 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds,
         std::cout << "Unknown command from connection:" << buffer << std::endl;
     }
 }
+
+
 
 int main(int argc, char *argv[])
 {
