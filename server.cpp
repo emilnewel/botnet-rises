@@ -153,12 +153,28 @@ void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
 void CONNECT(sockaddr_in server_addr, std::string address, int port)
 {
     int outSock = socket(AF_INET, SOCK_STREAM, 0);
+    std::cout << outSock << std::endl;
     hostent *server = gethostbyname(address.c_str());
 
     bzero((char *) &server_addr, sizeof(server_addr));
 
     bcopy((char *) server->h_addr, (char *) &server_addr.sin_addr.s_addr, server->h_length);
-    
+    if(connect(outSock, (struct sockaddr *) &server_addr, sizeof(server_addr)) >= 0){
+        std::cout << "Connected" << std::endl;
+        //std::string str = addTokens(message);
+        //strcpy(message, str.c_str());
+
+        //cout << "Connection to " << server->h_name << " successful" << endl;
+        //cout << "sending: \"" << message << "\" to socket " << externalSock << endl;
+
+        //send(externalSock, message, strlen(message), 0);
+        //int time = getTime();
+
+        //clients.push_back(new ClientInfo(externalSock, server->h_name, time));
+        //clients[clients.size() - 1]->tcpPort = tcpportno;
+    } else {
+        std::cout << "Connect failed"  << std::endl;
+    }
 }
 void LISTSERVERS(){
 
@@ -197,7 +213,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     }
         
     std::cout << tokens[0] << std::endl;
-    if (tokens[0].compare("CONNECT") == 0 && token.size() == 3)
+    if (tokens[0].compare("CONNECT") == 0 && tokens.size() == 3)
     {   
         std::cout << tokens[1] << ":" << tokens[2] << std::endl;
         struct sockaddr_in sk_addr;
@@ -363,8 +379,7 @@ int main(int argc, char *argv[])
                         else
                         {
                             std::cout << buffer << std::endl;
-                            clientCommand(client->sock, &openSockets, &maxfds,
-                                          buffer);
+                            clientCommand(client->sock, &openSockets, &maxfds, buffer, client);
                         }
                     }
                 }
