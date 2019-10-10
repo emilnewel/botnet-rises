@@ -134,30 +134,16 @@ int open_socket(int portno)
 void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
 {
     // Remove client from the clients list
-    std::cout << "PRE-ERASE" << std::endl;
-    clients.erase(clientSocket);
-    std::cout << "POST-ERASE" << std::endl;
-    
-
     // If this client's socket is maxfds then the next lowest
     // one has to be determined. Socket fd's can be reused by the Kernel,
     // so there aren't any nice ways to do this.
-
     if (*maxfds == clientSocket)
     {
-        std::cout << "IN IF" << std::endl;
-
         for (auto const &p : clients)
         {
-            std::cout << "IN FOR" << std::endl;
-
-            *maxfds = std::max(*maxfds, p.second->sock);
-            
+            *maxfds = std::max(*maxfds, p.second->sock);   
         }
-        std::cout << "AFTER FOR" << std::endl;
-
     }
-
     // And remove from the list of open sockets.
 
     FD_CLR(clientSocket, openSockets);
@@ -208,8 +194,30 @@ void GET_MSG()
 void SEND_MSG()
 {
 }
-void LEAVE()
+
+void LEAVE(std::string port, fd_set *openSockets, int *maxfds)
 {
+    for(const auto &c : clients)
+    {
+        std::cout << "PORT: " << port << " CLIENT SOCK: " << c.second->port << std::endl;
+        std::cout << *maxfds;
+        if(c.second->port == port)
+        {
+            Client *cl = c.second;
+            //clients.erase(cl->sock);   
+            if (*maxfds == cl->sock)
+            {
+                std::cout << "hello from if" << std::endl; 
+                for (auto const &p : clients)
+                {
+                    std::cout << "hello from for" << std::endl;
+                    *maxfds = std::max(*maxfds, p.second->sock);   
+                }   
+            }
+             
+        }
+    }
+
 }
 void STATUSREQ()
 {
@@ -223,16 +231,6 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     std::vector<std::string> tokens;
     std::string token;
     char msg[1000];
-
-    // Split command from client into tokens for parsing
-    for(int i = 0; i < strlen(buffer);i++)
-    {
-        if(buffer[i] == ',')
-        {
-            buffer[i] = ' ';
-        }
-        std::cout << buffer[i];
-    }
 
     std::stringstream stream(buffer);
 
@@ -278,9 +276,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     else if (tokens[0].compare("LEAVE") == 0)
     {
         //TODO: IMPLEMENT
-        std::cout << "haeaeaa";
-        //std::cout << clients[4002]->sock << std::endl;
-        closeClient(clients[4002]->sock, openSockets, maxfds);
+        LEAVE(tokens[2], openSockets, maxfds);
     }
     else if (tokens[0].compare("STATUSREQ") == 0)
     {
