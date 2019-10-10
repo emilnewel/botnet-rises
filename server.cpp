@@ -150,7 +150,7 @@ void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
     FD_CLR(clientSocket, openSockets);
 }
 
-void connectToServer(sockaddr_in server_addr, std::string address, int port)
+void CONNECT(sockaddr_in server_addr, std::string address, int port)
 {
     int outSock = socket(AF_INET, SOCK_STREAM, 0);
     hostent *server = gethostbyname(address.c_str());
@@ -160,8 +160,30 @@ void connectToServer(sockaddr_in server_addr, std::string address, int port)
     bcopy((char *) server->h_addr, (char *) &server_addr.sin_addr.s_addr, server->h_length);
     
 }
+void LISTSERVERS(){
 
-// Process command from client on the server
+}
+void SERVERS(){
+
+}
+void KEEPALIVE(){
+
+}
+void GET_MSG(){
+
+}
+void SEND_MSG(){
+
+}
+void LEAVE(){
+
+}
+void STATUSREQ(){
+
+}
+void STATUSRESP(){
+    
+}
 void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buffer, Client* client)
 {
     std::vector<std::string> tokens;
@@ -183,7 +205,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
         sk_addr.sin_addr.s_addr = INADDR_ANY;
         sk_addr.sin_port        = htons(stoi(tokens[2]));
 
-        connectToServer(sk_addr, tokens[1], stoi(tokens[2]));
+        CONNECT(sk_addr, tokens[1], stoi(tokens[2]));
     }
     else if (tokens[0].compare("LISTSERVERS") == 0)
     {
@@ -199,6 +221,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     else if (tokens[0].compare("KEEPALIVE") == 0)
     {
         //TODO: IMPLEMENT
+        KEEPALIVE();
     }
     else if (tokens[0].compare("GET_MSG") == 0)
     {
@@ -216,18 +239,22 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     else if (tokens[0].compare("SEND_MSG") == 0)
     {
         //TODO: IMPLEMENT
+        SEND_MSG();
     }
     else if (tokens[0].compare("LEAVE") == 0)
     {
         //TODO: IMPLEMENT
+        LEAVE();
     }
     else if (tokens[0].compare("STATUSREQ") == 0)
     {
         //TODO: IMPLEMENT
+        STATUSREQ();
     }
     else if (tokens[0].compare("STATUSRESP") == 0)
     {
         //TODO: IMPLEMENT
+        STATUSRESP();
     }
     else
     {
