@@ -134,7 +134,10 @@ int open_socket(int portno)
 void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
 {
     // Remove client from the clients list
+    std::cout << "PRE-ERASE" << std::endl;
     clients.erase(clientSocket);
+    std::cout << "POST-ERASE" << std::endl;
+    
 
     // If this client's socket is maxfds then the next lowest
     // one has to be determined. Socket fd's can be reused by the Kernel,
@@ -142,10 +145,17 @@ void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
 
     if (*maxfds == clientSocket)
     {
+        std::cout << "IN IF" << std::endl;
+
         for (auto const &p : clients)
         {
+            std::cout << "IN FOR" << std::endl;
+
             *maxfds = std::max(*maxfds, p.second->sock);
+            
         }
+        std::cout << "AFTER FOR" << std::endl;
+
     }
 
     // And remove from the list of open sockets.
@@ -215,6 +225,15 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     char msg[1000];
 
     // Split command from client into tokens for parsing
+    for(int i = 0; i < strlen(buffer);i++)
+    {
+        if(buffer[i] == ',')
+        {
+            buffer[i] = ' ';
+        }
+        std::cout << buffer[i];
+    }
+
     std::stringstream stream(buffer);
 
     while (stream >> token)
@@ -259,7 +278,9 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     else if (tokens[0].compare("LEAVE") == 0)
     {
         //TODO: IMPLEMENT
-        LEAVE();
+        std::cout << "haeaeaa";
+        //std::cout << clients[4002]->sock << std::endl;
+        closeClient(clients[4002]->sock, openSockets, maxfds);
     }
     else if (tokens[0].compare("STATUSREQ") == 0)
     {
