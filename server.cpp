@@ -48,8 +48,9 @@ public:
     int port;
     std::string listServers;
     bool isClient;
-    
-    Client(int socket){
+
+    Client(int socket)
+    {
         this->sock = socket;
         port = 0;
     }
@@ -153,54 +154,49 @@ void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
 void CONNECT(sockaddr_in server_addr, std::string address, int port)
 {
     int outSock = socket(AF_INET, SOCK_STREAM, 0);
-    std::cout << outSock << std::endl;
     hostent *server = gethostbyname(address.c_str());
 
-    bzero((char *) &server_addr, sizeof(server_addr));
+    bzero((char *)&server_addr, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(port);
 
-    bcopy((char *) server->h_addr, (char *) &server_addr.sin_addr.s_addr, server->h_length);
-    if(connect(outSock, (struct sockaddr *) &server_addr, sizeof(server_addr)) >= 0){
+    bcopy((char *)server->h_addr, (char *)&server_addr.sin_addr.s_addr, server->h_length);
+    if (connect(outSock, (struct sockaddr *)&server_addr, sizeof(server_addr)) >= 0)
+    {
         std::cout << "Connected" << std::endl;
-        //std::string str = addTokens(message);
-        //strcpy(message, str.c_str());
-
-        //cout << "Connection to " << server->h_name << " successful" << endl;
-        //cout << "sending: \"" << message << "\" to socket " << externalSock << endl;
-
-        //send(externalSock, message, strlen(message), 0);
-        //int time = getTime();
-
-        //clients.push_back(new ClientInfo(externalSock, server->h_name, time));
-        //clients[clients.size() - 1]->tcpPort = tcpportno;
-    } else {
-        std::cout << "Connect failed"  << std::endl;
+    }
+    else
+    {
+        std::cout << "Connect failed" << std::endl;
     }
 }
-void LISTSERVERS(){
+void LISTSERVERS()
+{
+}
+void SERVERS()
+{
+}
+void KEEPALIVE()
+{
+}
+void GET_MSG()
+{
+}
+void SEND_MSG()
+{
+}
+void LEAVE()
+{
+}
+void STATUSREQ()
+{
+}
+void STATUSRESP()
+{
+}
 
-}
-void SERVERS(){
-
-}
-void KEEPALIVE(){
-
-}
-void GET_MSG(){
-
-}
-void SEND_MSG(){
-
-}
-void LEAVE(){
-
-}
-void STATUSREQ(){
-
-}
-void STATUSRESP(){
-    
-}
-void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buffer, Client* client)
+void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buffer, Client *client)
 {
     std::vector<std::string> tokens;
     std::string token;
@@ -208,19 +204,15 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     // Split command from client into tokens for parsing
     std::stringstream stream(buffer);
 
-    while (stream >> token){
+    while (stream >> token)
+    {
         tokens.push_back(token);
     }
-        
+
     std::cout << tokens[0] << std::endl;
     if (tokens[0].compare("CONNECT") == 0 && tokens.size() == 3)
-    {   
-        std::cout << tokens[1] << ":" << tokens[2] << std::endl;
+    {
         struct sockaddr_in sk_addr;
-        sk_addr.sin_family      = AF_INET;
-        sk_addr.sin_addr.s_addr = INADDR_ANY;
-        sk_addr.sin_port        = htons(stoi(tokens[2]));
-
         CONNECT(sk_addr, tokens[1], stoi(tokens[2]));
     }
     else if (tokens[0].compare("LISTSERVERS") == 0)
@@ -279,8 +271,6 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
         std::cout << "Unknown command from connection:" << buffer << std::endl;
     }
 }
-
-
 
 int main(int argc, char *argv[])
 {
