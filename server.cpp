@@ -193,10 +193,12 @@ void GET_MSG()
 }
 void SEND_MSG(std::string groupName, std::string msg)
 {
+    char buff[100];
+    strcpy(buff,msg.c_str());
     for(auto const& c : clients)
     {
         if(c.second->groupName == groupName){
-            send(c.second->sock, msg, strlen(msg), 0);
+            send(c.second->sock, buff, strlen(buff), 0);
         }
     }
 }
@@ -239,6 +241,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     char msg[1000];
 
     std::stringstream stream(buffer);
+    while(stream >> token)
     {
         tokens.push_back(token);
     }
