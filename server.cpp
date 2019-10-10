@@ -211,9 +211,9 @@ void LEAVE(std::string port, fd_set *openSockets, int *maxfds)
         std::cout << *maxfds;
         if(c.second->port == port)
         {
-            Client *cl = c.second;
-            //clients.erase(cl->sock);   
-            if (*maxfds == cl->sock)
+            //Client *cl = c.second;
+            clients.erase(c.second->sock);   
+            if (*maxfds == c.second->sock)
             {
                 std::cout << "hello from if" << std::endl; 
                 for (auto const &p : clients)
