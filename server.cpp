@@ -44,15 +44,17 @@ class Client
 {
 public:
     int sock;         // socket of client connection
-    std::string name; // Limit length of name of client's user
-    int port;
-    std::string listServers;
-    bool isClient;
+    std::string groupName; // Limit length of name of client's user
+    std::string ip;
+    std::string port;
 
-    Client(int socket)
+    Client(int socket, std::string ip, std::string port, std::string groupName)
     {
         this->sock = socket;
-        port = 0;
+        this->port = port;
+        this->groupName = groupName;
+        this->ip = ip;
+        
     }
 
     ~Client() {} // Virtual destructor defined for base class
@@ -155,7 +157,6 @@ void CONNECT(sockaddr_in server_addr, std::string address, int port)
 {
     int outSock = socket(AF_INET, SOCK_STREAM, 0);
     hostent *server = gethostbyname(address.c_str());
-
     bzero((char *)&server_addr, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
@@ -165,14 +166,25 @@ void CONNECT(sockaddr_in server_addr, std::string address, int port)
     if (connect(outSock, (struct sockaddr *)&server_addr, sizeof(server_addr)) >= 0)
     {
         std::cout << "Connected" << std::endl;
+        Client* c = new Client(outSock,address,std::to_string(port), "V_GROUP_2");
+        clients[outSock] = c;
+        
     }
     else
     {
         std::cout << "Connect failed" << std::endl;
     }
 }
-void LISTSERVERS()
+std::string LISTSERVERS()
 {
+    std::string str;
+    for(auto const& c : clients)
+    {
+        Client* cl = c.second;
+        str += cl->groupName + "," + cl->ip + "," + cl->port + ";";
+    }
+    std::cout << str << std::endl;
+    return str;
 }
 void SERVERS()
 {
@@ -200,6 +212,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
 {
     std::vector<std::string> tokens;
     std::string token;
+    char msg[1000];
 
     // Split command from client into tokens for parsing
     std::stringstream stream(buffer);
@@ -217,14 +230,8 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     }
     else if (tokens[0].compare("LISTSERVERS") == 0)
     {
-        for (auto it = clients.cbegin(); it != clients.cend(); ++it)
-        {
-            if (clientSocket == it->first)
-            {
-                it->second->name = tokens[1];
-            }
-            std::cout << it->first << " " << it->second->name << "\n";
-        }
+        strcpy(msg, LISTSERVERS().c_str());
+        send(clientSocket, msg, strlen(msg), 0);
     }
     else if (tokens[0].compare("KEEPALIVE") == 0)
     {
@@ -238,7 +245,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
 
         for (auto const &names : clients)
         {
-            msg += names.second->name + ",";
+            msg += names.second->groupName + ",";
         }
         // Reducing the msg length by 1 loses the excess "," - which
         // granted is totally cheating.
@@ -340,7 +347,7 @@ int main(int argc, char *argv[])
                 maxfds = std::max(maxfds, clientSock);
 
                 // create a new client to store information.
-                clients[clientSock] = new Client(clientSock);
+                clients[clientSock] = new Client(clientSock, "127.0.0.1", "4001", "Client");
 
                 // Decrement the number of sockets waiting to be dealt with
                 n--;
