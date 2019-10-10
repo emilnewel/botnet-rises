@@ -156,9 +156,11 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds,
   std::stringstream stream(buffer);
 
   while(stream >> token)
-      tokens.push_back(token);
-
-  if(tokens[0].compare("LISTSERVERS") == 0)
+      tokens.push_back(token); 
+  if(token[0].compare("CONNECT") == 0 && token.size() == 3){
+      
+  }
+  else if(tokens[0].compare("LISTSERVERS") == 0)
   {
     
     for(auto it = clients.cbegin(); it != clients.cend(); ++it)
