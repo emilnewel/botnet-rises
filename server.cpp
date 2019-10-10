@@ -134,10 +134,7 @@ int open_socket(int portno)
 void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
 {
     // Remove client from the clients list
-    std::cout << "PRE-ERASE" << std::endl;
     clients.erase(clientSocket);
-    std::cout << "POST-ERASE" << std::endl;
-    
 
     // If this client's socket is maxfds then the next lowest
     // one has to be determined. Socket fd's can be reused by the Kernel,
@@ -145,17 +142,10 @@ void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
 
     if (*maxfds == clientSocket)
     {
-        std::cout << "IN IF" << std::endl;
-
         for (auto const &p : clients)
         {
-            std::cout << "IN FOR" << std::endl;
-
             *maxfds = std::max(*maxfds, p.second->sock);
-            
         }
-        std::cout << "AFTER FOR" << std::endl;
-
     }
 
     // And remove from the list of open sockets.
@@ -187,7 +177,7 @@ void CONNECT(sockaddr_in server_addr, std::string address, int port)
 }
 std::string LISTSERVERS()
 {
-    std::string str;
+    std::string str = "SERVERS,";
     for(auto const& c : clients)
     {
         Client* cl = c.second;
@@ -205,11 +195,19 @@ void KEEPALIVE()
 void GET_MSG()
 {
 }
-void SEND_MSG()
+void SEND_MSG(std::string groupName, std::string msg)
 {
+    for(auto const& c : clients)
+    {
+        if(c.second->groupName == groupName){
+            send(c.second->sock, msg, strlen(msg), 0);
+        }
+    }
 }
 void LEAVE()
 {
+    //close(user->sock);
+
 }
 void STATUSREQ()
 {
@@ -225,15 +223,6 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     char msg[1000];
 
     // Split command from client into tokens for parsing
-    for(int i = 0; i < strlen(buffer);i++)
-    {
-        if(buffer[i] == ',')
-        {
-            buffer[i] = ' ';
-        }
-        std::cout << buffer[i];
-    }
-
     std::stringstream stream(buffer);
 
     while (stream >> token)
@@ -273,14 +262,12 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     else if (tokens[0].compare("SEND_MSG") == 0)
     {
         //TODO: IMPLEMENT
-        SEND_MSG();
+        SEND_MSG(tokens[2],tokens[3]);
     }
     else if (tokens[0].compare("LEAVE") == 0)
     {
         //TODO: IMPLEMENT
-        std::cout << "haeaeaa";
-        //std::cout << clients[4002]->sock << std::endl;
-        closeClient(clients[4002]->sock, openSockets, maxfds);
+        //LEAVE(clients);
     }
     else if (tokens[0].compare("STATUSREQ") == 0)
     {
