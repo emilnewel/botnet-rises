@@ -150,8 +150,18 @@ void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
     FD_CLR(clientSocket, openSockets);
 }
 
-// Process command from client on the server
+void connectToServer(sockaddr_in server_addr, std::string address, int port)
+{
+    int outSock = socket(AF_INET, SOCK_STREAM, 0);
+    hostent *server = gethostbyname(address.c_str());
 
+    bzero((char *) &server_addr, sizeof(server_addr));
+
+    bcopy((char *) server->h_addr, (char *) &server_addr.sin_addr.s_addr, server->h_length);
+    
+}
+
+// Process command from client on the server
 void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buffer, Client* client)
 {
     std::vector<std::string> tokens;
@@ -173,10 +183,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
         sk_addr.sin_addr.s_addr = INADDR_ANY;
         sk_addr.sin_port        = htons(stoi(tokens[2]));
 
-        if (connect(clientSocket, (struct sockaddr *)&sk_addr, sizeof(sk_addr)) < 0) 
-        { 
-            printf("\nConnection Failed \n");  
-        } 
+        connectToServer(sk_addr, tokens[1], stoi(tokens[2]));
     }
     else if (tokens[0].compare("LISTSERVERS") == 0)
     {
