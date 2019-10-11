@@ -131,6 +131,22 @@ int open_socket(int portno)
 // Close a client's connection, remove it from the client list, and
 // tidy up select sockets afterwards.
 
+//Adds SoH and EoT to string before sending
+std::string addToString(std::string msg)
+{
+    msg.insert(0, "\0x01");
+    msg.append("\0x04");
+    return msg;
+}
+
+//Removes SoH and EoT from string
+std::string santizeMsg(std::string msg)
+{
+    std::string cleanMsg;
+    cleanMsg = msg.substr(1, msg.length()-1);
+    return cleanMsg;
+}
+
 void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
 {
     // Remove client from the clients list
@@ -207,22 +223,11 @@ void LEAVE(std::string port, fd_set *openSockets, int *maxfds)
 {
     for(const auto &c : clients)
     {
-        std::cout << "PORT: " << port << " CLIENT SOCK: " << c.second->port << std::endl;
-        std::cout << *maxfds;
         if(c.second->port == port)
         {
-            //Client *cl = c.second;
-            clients.erase(c.second->sock);   
-            if (*maxfds == c.second->sock)
-            {
-                std::cout << "hello from if" << std::endl; 
-                for (auto const &p : clients)
-                {
-                    std::cout << "hello from for" << std::endl;
-                    *maxfds = std::max(*maxfds, p.second->sock);   
-                }   
-            }
-             
+            close(c.second->sock);
+            clients.erase(c.second->sock);
+            
         }
     }
 
@@ -234,6 +239,8 @@ void STATUSRESP()
 {
 }
 
+
+
 void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buffer, Client *client)
 {
     std::vector<std::string> tokens;
@@ -241,8 +248,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     char msg[1000];
 
     std::stringstream stream(buffer);
-    while(stream >> token)
-    {
+    while(std::getline(stream, token, ',')) {
         tokens.push_back(token);
     }
 
