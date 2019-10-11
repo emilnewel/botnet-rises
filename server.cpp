@@ -68,7 +68,7 @@ public:
 // (indexed on socket no.) sacrificing memory for speed.
 
 std::map<int, Client *> clients; // Lookup table for per Client information
-
+std::map<std::string, std::string> messages;
 // Open socket for specified port.
 //
 // Returns -1 if unable to create the socket for any reason.
@@ -227,10 +227,8 @@ void LEAVE(std::string port, fd_set *openSockets, int *maxfds)
         {
             close(c.second->sock);
             clients.erase(c.second->sock);
-            
         }
     }
-
 }
 void STATUSREQ()
 {
@@ -238,9 +236,6 @@ void STATUSREQ()
 void STATUSRESP()
 {
 }
-
-
-
 void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buffer, Client *client)
 {
     std::vector<std::string> tokens;
@@ -270,21 +265,17 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     }
     else if (tokens[0].compare("GET_MSG") == 0)
     {
-        std::cout << "Who is logged on" << std::endl;
-        std::string msg;
-
-        for (auto const &names : clients)
+        std::cout << "this is message " << messages.find(tokens[1]) << std::endl;
+        for(const auto& i: messages)
         {
-            msg += names.second->groupName + ",";
+            std::cout << "first " << i.first;
+            std::cout << "second " << i.second;
         }
-        // Reducing the msg length by 1 loses the excess "," - which
-        // granted is totally cheating.
-        send(clientSocket, msg.c_str(), msg.length() - 1, 0);
     }
     else if (tokens[0].compare("SEND_MSG") == 0)
     {
         //TODO: IMPLEMENT
-        SEND_MSG(tokens[2],tokens[3]);
+        SEND_MSG(tokens[2], "msg," + tokens[1] + "," + tokens[2] + "," + tokens[3]);
     }
     else if (tokens[0].compare("LEAVE") == 0)
     {
@@ -300,6 +291,15 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     {
         //TODO: IMPLEMENT
         STATUSRESP();
+    }
+    else if(tokens[0].compare("msg") == 0){
+        if(messages.count(tokens[1]))
+        {
+            messages[tokens[1]] += tokens[3];
+        } else {
+            messages[tokens[1]] = tokens[3];
+        }
+        
     }
     else
     {
