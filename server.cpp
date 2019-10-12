@@ -288,29 +288,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     }
     else if (tokens[0].compare("GET_MSG") == 0)
     {
-        for(auto msg : messages)
-        {
-            tokens[1].erase(std::remove(tokens[1].begin(), tokens[1].end(), '\n'), tokens[1].end());
-            std::cout << msg.first << " === " << tokens[1];
-<<<<<<< HEAD
-            std::string strmsg(msg.first);
-            if(strmsg == tokens[1])
-=======
-            if(msg.first.compare(tokens[1]) == 0 )
->>>>>>> 66c3510a46075550a4d2397600f8c918ffedc01e
-            {
-                std::cout << msg.second << "\n";
-            } 
-            else if( msg.first.compare(tokens[1]) > 0)
-            {
-                std::cout << "TOKENS BIGGER THAN MSG.FIRST: " << msg.first.length() << "x" << msg.first.c_str() <<  "x" << std::endl;
-            }
-            else 
-            {
-
-                std::cout << "MSG.FIRST BIGGER THAN TOKENS: " << tokens[1].length() << "x" << tokens[1].c_str() << "x" <<  std::endl;
-            }
-        }
+        tokens[1].erase(std::remove(tokens[1].begin(), tokens[1].end(), '\n'), tokens[1].end());
         GET_MSG(clientSocket, messages.find(tokens[1])->second);
     }
     else if (tokens[0].compare("SEND_MSG") == 0)
