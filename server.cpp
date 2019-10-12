@@ -204,8 +204,13 @@ void SERVERS()
 void KEEPALIVE()
 {
 }
-void GET_MSG()
+void GET_MSG(int sock, std::string msg)
 {
+    char buff[100];
+    std::cout << msg << std::endl;
+    strcpy(buff,msg.c_str());
+    send(sock, buff, strlen(buff), 0);
+    
 }
 void SEND_MSG(std::string groupName, std::string msg)
 {
@@ -245,15 +250,15 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     std::stringstream stream(buffer);
     while(std::getline(stream, token, ',')) {
         tokens.push_back(token);
+        
     }
-
     std::cout << tokens[0] << std::endl;
     if (tokens[0].compare("CONNECT") == 0 && tokens.size() == 3)
     {
         struct sockaddr_in sk_addr;
         CONNECT(sk_addr, tokens[1], stoi(tokens[2]));
     }
-    else if (tokens[0].compare("LISTSERVERS") == 0)
+    else if (tokens[0].compare("LISTSERVERS") == 0 || std::strncmp(buffer, "LISTSERVERS", 11) == 0)
     {
         strcpy(msg, LISTSERVERS().c_str());
         send(clientSocket, msg, strlen(msg), 0);
@@ -265,12 +270,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     }
     else if (tokens[0].compare("GET_MSG") == 0)
     {
-        std::cout << "this is message " << messages.find(tokens[1]) << std::endl;
-        for(const auto& i: messages)
-        {
-            std::cout << "first " << i.first;
-            std::cout << "second " << i.second;
-        }
+        GET_MSG(clientSocket, messages.find(tokens[1])->second);
     }
     else if (tokens[0].compare("SEND_MSG") == 0)
     {
@@ -299,7 +299,6 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
         } else {
             messages[tokens[1]] = tokens[3];
         }
-        
     }
     else
     {
