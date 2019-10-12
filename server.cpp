@@ -274,7 +274,8 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
         struct sockaddr_in sk_addr;
         CONNECT(sk_addr, tokens[1], stoi(tokens[2]));
     }
-    else if (tokens[0].compare("LISTSERVERS") == 0 || std::strncmp(buffer, "LISTSERVERS", 11) == 0)
+
+    else if (tokens[0].compare("LISTSERVERS") == 0)
     {
         strcpy(msg, LISTSERVERS().c_str());
         send(clientSocket, msg, strlen(msg), 0);
@@ -286,6 +287,14 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     }
     else if (tokens[0].compare("GET_MSG") == 0)
     {
+        for(auto msg : messages)
+        {
+            std::cout << msg.first << " === " << tokens[1];
+            if(msg.first.compare(tokens[1]) == 0)
+            {
+                std::cout << msg.second << "\n";
+            }
+        }
         GET_MSG(clientSocket, messages.find(tokens[1])->second);
     }
     else if (tokens[0].compare("SEND_MSG") == 0)
