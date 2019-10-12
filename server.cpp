@@ -21,7 +21,7 @@
 #include <algorithm>
 #include <map>
 #include <vector>
-
+#include <cstring>
 #include <iostream>
 #include <sstream>
 #include <thread>
@@ -140,8 +140,15 @@ std::string addToString(std::string msg)
 std::string santizeMsg(std::string msg)
 {
     std::string cleanMsg;
-    cleanMsg = msg.substr(1, msg.length() - 1);
-    return cleanMsg;
+    if(msg[0] == '\1')
+    {
+        cleanMsg = msg.substr(1, msg.length() - 1);
+        return cleanMsg;    
+    }
+    else {
+        return msg;
+    }
+    
 }
 bool maxConnections()
 {
@@ -187,6 +194,8 @@ void CONNECT(sockaddr_in server_addr, std::string address, int port)
             std::cout << "Connected" << std::endl;
             Client *c = new Client(outSock, address, std::to_string(port), "P3_GROUP_2");
             clients[outSock] = c;
+            std::string sendServ = addToString("LISTSERVERS,P3_GROUP_2");
+            send(outSock, sendServ.c_str(), strlen(sendServ.c_str()), 0);
         }
         else
         {
@@ -280,6 +289,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     {
         struct sockaddr_in sk_addr;
         CONNECT(sk_addr, tokens[1], stoi(tokens[2]));
+        
     }
 
     else if (tokens[0].compare("LISTSERVERS") == 0 || std::strncmp("LISTSERVERS", buffer, 11) == 0)
@@ -347,7 +357,7 @@ int main(int argc, char *argv[])
     int maxfds;           // Passed to select() as max fd in set
     struct sockaddr_in client;
     socklen_t clientLen;
-    char clientIp[INET_ADDRSTRLEN]; //Container for client connection IP address.
+    char* clientIp = new char[INET_ADDRSTRLEN]; //Container for client connection IP address.
     char buffer[1025];              // buffer for reading from clients
 
     // Setup socket for server to listen to
@@ -402,7 +412,6 @@ int main(int argc, char *argv[])
                 inet_ntop(AF_INET, &(client.sin_addr), clientIp, INET_ADDRSTRLEN);
                 // create a new client to store information.
                 clients[clientSock] = new Client(clientSock, clientIp, argv[1], "P3_GROUP_2");
-                //send(clientSock, "LISTSERVERS", size)
                 // Decrement the number of sockets waiting to be dealt with
                 n--;
 
