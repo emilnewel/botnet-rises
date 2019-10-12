@@ -290,7 +290,8 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
         for(auto msg : messages)
         {
             std::cout << msg.first << " === " << tokens[1];
-            if(msg.first.compare(tokens[1]) == 0)
+            std::string strmsg(msg.first);
+            if(strmsg == tokens[1])
             {
                 std::cout << msg.second << "\n";
             }
