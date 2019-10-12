@@ -411,9 +411,8 @@ int main(int argc, char *argv[])
                 std::vector<std::string> tokens = splitBuffer(buffer);
                 
                 inet_ntop(AF_INET, &(client.sin_addr), clientIp, INET_ADDRSTRLEN);
-                std::string strCIP(clientIp);
                 // create a new client to store information.
-                clients[clientSock] = new Client(clientSock, strCIP, argv[1], "V_GROUP_2");
+                clients[clientSock] = new Client(clientSock, clientIp, argv[1], "V_GROUP_2");
 
                 // Decrement the number of sockets waiting to be dealt with
                 n--;
