@@ -146,7 +146,13 @@ std::string santizeMsg(std::string msg)
     cleanMsg = msg.substr(1, msg.length()-1);
     return cleanMsg;
 }
-
+bool maxConnections(){
+    if(clients.size() >= 5) {
+        return true;
+    }
+    else 
+        return false;
+}
 void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
 {
     // Remove client from the clients list
@@ -167,25 +173,30 @@ void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
 
 void CONNECT(sockaddr_in server_addr, std::string address, int port)
 {
-    int outSock = socket(AF_INET, SOCK_STREAM, 0);
-    hostent *server = gethostbyname(address.c_str());
-    bzero((char *)&server_addr, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port = htons(port);
+    if(!maxConnections()){
+        int outSock = socket(AF_INET, SOCK_STREAM, 0);
+        hostent *server = gethostbyname(address.c_str());
+        bzero((char *)&server_addr, sizeof(server_addr));
+        server_addr.sin_family = AF_INET;
+        server_addr.sin_addr.s_addr = INADDR_ANY;
+        server_addr.sin_port = htons(port);
 
-    bcopy((char *)server->h_addr, (char *)&server_addr.sin_addr.s_addr, server->h_length);
-    if (connect(outSock, (struct sockaddr *)&server_addr, sizeof(server_addr)) >= 0)
-    {
-        std::cout << "Connected" << std::endl;
-        Client* c = new Client(outSock,address,std::to_string(port), "V_GROUP_2");
-        clients[outSock] = c;
-        
+        bcopy((char *)server->h_addr, (char *)&server_addr.sin_addr.s_addr, server->h_length);
+        if (connect(outSock, (struct sockaddr *)&server_addr, sizeof(server_addr)) >= 0)
+        {
+            std::cout << "Connected" << std::endl;
+            Client* c = new Client(outSock,address,std::to_string(port), "V_GROUP_2");
+            clients[outSock] = c;
+            
+        }
+        else
+        {
+            std::cout << "Connect failed" << std::endl;
+        }
+    } else {
+        std::cout << "Connect failed, max connections reached" << std::endl;
     }
-    else
-    {
-        std::cout << "Connect failed" << std::endl;
-    }
+    
 }
 std::string LISTSERVERS()
 {
@@ -236,18 +247,22 @@ void STATUSREQ()
 void STATUSRESP()
 {
 }
-void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buffer, Client *client)
+std::vector<std::string> splitBuffer(char buffer[1025])
 {
     std::vector<std::string> tokens;
     std::string token;
-    char msg[1000];
-
     std::stringstream stream(buffer);
+
     while(std::getline(stream, token, ',')) {
         tokens.push_back(token);
     }
+    return tokens;
 
-    std::cout << tokens[0] << std::endl;
+}
+void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buffer, Client *client)
+{
+    char msg[1000];
+    std::vector<std::string> tokens = splitBuffer(buffer);
     if (tokens[0].compare("CONNECT") == 0 && tokens.size() == 3)
     {
         struct sockaddr_in sk_addr;
@@ -265,7 +280,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     }
     else if (tokens[0].compare("GET_MSG") == 0)
     {
-        std::cout << "this is message " << messages.find(tokens[1]) << std::endl;
+        //std::cout << "this is message " << messages.find(tokens[1]) << std::endl;
         for(const auto& i: messages)
         {
             std::cout << "first " << i.first;
@@ -375,7 +390,8 @@ int main(int argc, char *argv[])
 
                 // And update the maximum file descriptor
                 maxfds = std::max(maxfds, clientSock);
-
+                // splits buffer for client connections
+                std::vector<std::string> tokens = splitBuffer(buffer);
                 // create a new client to store information.
                 clients[clientSock] = new Client(clientSock, "127.0.0.1", "4001", "Client");
 
