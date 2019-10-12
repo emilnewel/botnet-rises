@@ -133,9 +133,7 @@ int open_socket(int portno)
 //Adds SoH and EoT to string before sending
 std::string addToString(std::string msg)
 {
-    msg.insert(0, "\0x01");
-    msg.append("\0x04");
-    return msg;
+    return '\1' + msg + '\4';
 }
 
 //Removes SoH and EoT from string
@@ -187,7 +185,7 @@ void CONNECT(sockaddr_in server_addr, std::string address, int port)
         if (connect(outSock, (struct sockaddr *)&server_addr, sizeof(server_addr)) >= 0)
         {
             std::cout << "Connected" << std::endl;
-            Client *c = new Client(outSock, address, std::to_string(port), "V_GROUP_2");
+            Client *c = new Client(outSock, address, std::to_string(port), "P3_GROUP_2");
             clients[outSock] = c;
         }
         else
@@ -200,23 +198,28 @@ void CONNECT(sockaddr_in server_addr, std::string address, int port)
         std::cout << "Connect failed, max connections reached" << std::endl;
     }
 }
-std::string LISTSERVERS()
+std::string LISTSERVERS(int sock)
 {
     std::string str = "SERVERS,";
+    str += clients[sock]->groupName + "," + clients[sock]->ip + "," + clients[sock]->port + ";";
+     
     for (auto const &c : clients)
     {
         Client *cl = c.second;
-        str += cl->groupName + "," + cl->ip + "," + cl->port + ";";
+        if(cl->groupName != "P3_GROUP_2")
+        {
+            str += cl->groupName + "," + cl->ip + "," + cl->port + ";";
+        }
+        
     }
     std::cout << str << std::endl;
-    return str;
+    return addToString(str);
 }
-void SERVERS()
-{
-}
+
 void KEEPALIVE()
 {
 }
+
 void GET_MSG(int sock, std::string msg)
 {
     char buff[100];
@@ -224,6 +227,7 @@ void GET_MSG(int sock, std::string msg)
     strcpy(buff, msg.c_str());
     send(sock, buff, strlen(buff), 0);
 }
+
 void SEND_MSG(std::string groupName, std::string msg)
 {
     char buff[100];
@@ -254,11 +258,11 @@ void STATUSREQ()
 void STATUSRESP()
 {
 }
-std::vector<std::string> splitBuffer(char buffer[1025])
+std::vector<std::string> splitBuffer(std::string buf)
 {
     std::vector<std::string> tokens;
     std::string token;
-    std::stringstream stream(buffer);
+    std::stringstream stream(buf);
 
     while (std::getline(stream, token, ','))
     {
@@ -269,7 +273,9 @@ std::vector<std::string> splitBuffer(char buffer[1025])
 void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buffer, Client *client)
 {
     char msg[1000];
-    std::vector<std::string> tokens = splitBuffer(buffer);
+    std::string cleanBuf = santizeMsg(buffer);
+    std::vector<std::string> tokens = splitBuffer(cleanBuf);
+    std::cout << "BUFFER ::: " << cleanBuf << std::endl;
     if (tokens[0].compare("CONNECT") == 0 && tokens.size() == 3)
     {
         struct sockaddr_in sk_addr;
@@ -277,8 +283,8 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     }
 
     else if (tokens[0].compare("LISTSERVERS") == 0 || std::strncmp("LISTSERVERS", buffer, 11) == 0)
-    {
-        strcpy(msg, LISTSERVERS().c_str());
+    {  
+        strcpy(msg, LISTSERVERS(clientSocket).c_str());
         send(clientSocket, msg, strlen(msg), 0);
     }
     else if (tokens[0].compare("KEEPALIVE") == 0)
@@ -395,8 +401,8 @@ int main(int argc, char *argv[])
                 
                 inet_ntop(AF_INET, &(client.sin_addr), clientIp, INET_ADDRSTRLEN);
                 // create a new client to store information.
-                clients[clientSock] = new Client(clientSock, clientIp, argv[1], "V_GROUP_2");
-
+                clients[clientSock] = new Client(clientSock, clientIp, argv[1], "P3_GROUP_2");
+                //send(clientSock, "LISTSERVERS", size)
                 // Decrement the number of sockets waiting to be dealt with
                 n--;
 
