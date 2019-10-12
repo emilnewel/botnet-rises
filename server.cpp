@@ -17,7 +17,7 @@
 #include <netinet/tcp.h>
 #include <netdb.h>
 #include <arpa/inet.h>
-#include <string.h>
+#include <string>
 #include <algorithm>
 #include <map>
 #include <vector>
@@ -276,7 +276,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
         CONNECT(sk_addr, tokens[1], stoi(tokens[2]));
     }
 
-    else if (tokens[0].compare("LISTSERVERS") == 0)
+    else if (tokens[0].compare("LISTSERVERS") == 0 || std::strncmp("LISTSERVERS", buffer, 11) == 0)
     {
         strcpy(msg, LISTSERVERS().c_str());
         send(clientSocket, msg, strlen(msg), 0);
@@ -290,10 +290,20 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     {
         for(auto msg : messages)
         {
+            tokens[1].erase(std::remove(tokens[1].begin(), tokens[1].end(), '\n'), tokens[1].end());
             std::cout << msg.first << " === " << tokens[1];
-            if(msg.first.compare(tokens[1]) == 0)
+            if(msg.first.compare(tokens[1]) == 0 )
             {
                 std::cout << msg.second << "\n";
+            } 
+            else if( msg.first.compare(tokens[1]) > 0)
+            {
+                std::cout << "TOKENS BIGGER THAN MSG.FIRST: " << msg.first.length() << "x" << msg.first.c_str() <<  "x" << std::endl;
+            }
+            else 
+            {
+
+                std::cout << "MSG.FIRST BIGGER THAN TOKENS: " << tokens[1].length() << "x" << tokens[1].c_str() << "x" <<  std::endl;
             }
         }
         GET_MSG(clientSocket, messages.find(tokens[1])->second);
@@ -401,9 +411,9 @@ int main(int argc, char *argv[])
                 std::vector<std::string> tokens = splitBuffer(buffer);
                 
                 inet_ntop(AF_INET, &(client.sin_addr), clientIp, INET_ADDRSTRLEN);
-                std::string str(clientIp);
+                std::string strCIP(clientIp);
                 // create a new client to store information.
-                clients[clientSock] = new Client(clientSock, clientIp, argv[1], "V_GROUP_2");
+                clients[clientSock] = new Client(clientSock, strCIP, argv[1], "V_GROUP_2");
 
                 // Decrement the number of sockets waiting to be dealt with
                 n--;
