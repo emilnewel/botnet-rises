@@ -43,7 +43,7 @@
 class Client
 {
 public:
-    int sock;         // socket of client connection
+    int sock;              // socket of client connection
     std::string groupName; // Limit length of name of client's user
     std::string ip;
     std::string port;
@@ -54,7 +54,6 @@ public:
         this->port = port;
         this->groupName = groupName;
         this->ip = ip;
-        
     }
 
     ~Client() {} // Virtual destructor defined for base class
@@ -143,14 +142,16 @@ std::string addToString(std::string msg)
 std::string santizeMsg(std::string msg)
 {
     std::string cleanMsg;
-    cleanMsg = msg.substr(1, msg.length()-1);
+    cleanMsg = msg.substr(1, msg.length() - 1);
     return cleanMsg;
 }
-bool maxConnections(){
-    if(clients.size() >= 5) {
+bool maxConnections()
+{
+    if (clients.size() >= 5)
+    {
         return true;
     }
-    else 
+    else
         return false;
 }
 void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
@@ -163,7 +164,7 @@ void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
     {
         for (auto const &p : clients)
         {
-            *maxfds = std::max(*maxfds, p.second->sock);   
+            *maxfds = std::max(*maxfds, p.second->sock);
         }
     }
     // And remove from the list of open sockets.
@@ -173,7 +174,8 @@ void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
 
 void CONNECT(sockaddr_in server_addr, std::string address, int port)
 {
-    if(!maxConnections()){
+    if (!maxConnections())
+    {
         int outSock = socket(AF_INET, SOCK_STREAM, 0);
         hostent *server = gethostbyname(address.c_str());
         bzero((char *)&server_addr, sizeof(server_addr));
@@ -185,25 +187,25 @@ void CONNECT(sockaddr_in server_addr, std::string address, int port)
         if (connect(outSock, (struct sockaddr *)&server_addr, sizeof(server_addr)) >= 0)
         {
             std::cout << "Connected" << std::endl;
-            Client* c = new Client(outSock,address,std::to_string(port), "V_GROUP_2");
+            Client *c = new Client(outSock, address, std::to_string(port), "V_GROUP_2");
             clients[outSock] = c;
-            
         }
         else
         {
             std::cout << "Connect failed" << std::endl;
         }
-    } else {
+    }
+    else
+    {
         std::cout << "Connect failed, max connections reached" << std::endl;
     }
-    
 }
 std::string LISTSERVERS()
 {
     std::string str = "SERVERS,";
-    for(auto const& c : clients)
+    for (auto const &c : clients)
     {
-        Client* cl = c.second;
+        Client *cl = c.second;
         str += cl->groupName + "," + cl->ip + "," + cl->port + ";";
     }
     std::cout << str << std::endl;
@@ -219,17 +221,17 @@ void GET_MSG(int sock, std::string msg)
 {
     char buff[100];
     std::cout << msg << std::endl;
-    strcpy(buff,msg.c_str());
+    strcpy(buff, msg.c_str());
     send(sock, buff, strlen(buff), 0);
-    
 }
 void SEND_MSG(std::string groupName, std::string msg)
 {
     char buff[100];
-    strcpy(buff,msg.c_str());
-    for(auto const& c : clients)
+    strcpy(buff, msg.c_str());
+    for (auto const &c : clients)
     {
-        if(c.second->groupName == groupName){
+        if (c.second->groupName == groupName)
+        {
             send(c.second->sock, buff, strlen(buff), 0);
         }
     }
@@ -237,9 +239,9 @@ void SEND_MSG(std::string groupName, std::string msg)
 
 void LEAVE(std::string port, fd_set *openSockets, int *maxfds)
 {
-    for(const auto &c : clients)
+    for (const auto &c : clients)
     {
-        if(c.second->port == port)
+        if (c.second->port == port)
         {
             close(c.second->sock);
             clients.erase(c.second->sock);
@@ -258,12 +260,11 @@ std::vector<std::string> splitBuffer(char buffer[1025])
     std::string token;
     std::stringstream stream(buffer);
 
-    while(std::getline(stream, token, ',')) {
+    while (std::getline(stream, token, ','))
+    {
         tokens.push_back(token);
-        
     }
     return tokens;
-
 }
 void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buffer, Client *client)
 {
@@ -308,11 +309,14 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
         //TODO: IMPLEMENT
         STATUSRESP();
     }
-    else if(tokens[0].compare("msg") == 0){
-        if(messages.count(tokens[1]))
+    else if (tokens[0].compare("msg") == 0)
+    {
+        if (messages.count(tokens[1]))
         {
             messages[tokens[1]] += tokens[3];
-        } else {
+        }
+        else
+        {
             messages[tokens[1]] = tokens[3];
         }
     }
@@ -335,16 +339,10 @@ int main(int argc, char *argv[])
     int maxfds;           // Passed to select() as max fd in set
     struct sockaddr_in client;
     socklen_t clientLen;
-    char buffer[1025]; // buffer for reading from clients
-
-    if (argc != 2)
-    {
-        printf("Usage: chat_server <ip port>\n");
-        exit(0);
-    }
+    char clientIp[INET_ADDRSTRLEN]; //Container for client connection IP address.
+    char buffer[1025];              // buffer for reading from clients
 
     // Setup socket for server to listen to
-
     listenSock = open_socket(atoi(argv[1]));
     printf("Listening on port: %d\n", atoi(argv[1]));
 
@@ -392,8 +390,11 @@ int main(int argc, char *argv[])
                 maxfds = std::max(maxfds, clientSock);
                 // splits buffer for client connections
                 std::vector<std::string> tokens = splitBuffer(buffer);
+                
+                inet_ntop(AF_INET, &(client.sin_addr), clientIp, INET_ADDRSTRLEN);
+                std::string str(clientIp);
                 // create a new client to store information.
-                clients[clientSock] = new Client(clientSock, "127.0.0.1", "4001", "Client");
+                clients[clientSock] = new Client(clientSock, clientIp, argv[1], "V_GROUP_2");
 
                 // Decrement the number of sockets waiting to be dealt with
                 n--;
