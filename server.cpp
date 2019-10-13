@@ -210,11 +210,14 @@ void CONNECT(std::string ip, std::string port, fd_set &open)
     sk_addr = getSockaddr_in(ip.c_str(), stoi(port));
 
     servSocket = open_socket(stoi(port));
-    if(connect(servSocket, (struct sockaddr *)&sk_addr, sizeof(sk_addr)) == 0)
+    if(connect(servSocket, (struct sockaddr *)&sk_addr, sizeof(sk_addr)) >= 0)
     {
         std::cout << "Succesfully connected to server: " << ip << " on port " << port << std::endl;
         FD_SET(servSocket, &open);
         servers[servSocket] = new Server(servSocket, ip, port);
+    }
+    else {
+        std::cout << "connection failed" << std::endl;
     }
 }
 
@@ -263,23 +266,29 @@ void handleClientCommand(fd_set &open, fd_set &read)
 {
     char buf[1024];
     int n;
+    std::cout <<  "IN HANDLECLIENT" << std::endl;
     for(const auto& pair: clients)
     {
         int sock = pair.second->sock;
         bool isActive = true;
+        std::cout <<  "IN FOR" << std::endl;
         if(FD_ISSET(sock, &read))
         {
+            std::cout <<  "IN IF ISSET" << std::endl;
             n = recv(sock, buf, sizeof(buf), MSG_DONTWAIT);
-            if (n <= 0)
+            std::cout <<  "N: " << n << std::endl;
+            if (n >= 0)
             {   
                 std::string str(buf);
                 std::vector<std::string> tokens = splitBuffer(str);
-                
-                if(strcmp(tokens[0].c_str(), "CONNECT"))
+
+                std::cout << "str" << str << std::endl;
+                if(tokens[0].compare("CONNECT") == 0 && tokens.size() == 3)
                 {
                     std::string ip = tokens[1];
                     std::string port = tokens[2];
                     CONNECT(ip, port, open);
+                    std::cout << "in here" << std::endl;
                 }
             } else {
                 isActive = false;
@@ -320,8 +329,8 @@ int main(int argc, char *argv[])
     clientPort = atoi(argv[2]);
     serverPort = atoi(argv[1]);
     // Setup socket for server to listen to
-    serverSock = open_socket(atoi(argv[1]));
-    clientSock = open_socket(atoi(argv[2]));
+    serverSock = open_socket(serverPort);
+    clientSock = open_socket(clientPort);
 
     FD_ZERO(&openSockets);
     FD_SET(clientSock, &openSockets);
