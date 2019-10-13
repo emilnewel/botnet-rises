@@ -148,13 +148,13 @@ struct sockaddr_in getSockaddr_in(const char *host, int port) {
         std::cerr << "Error resolving host" << std::endl;
         return serv_addr;
     }
-
+    bzero((char *)&serv_addr, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
-    memcpy((char *)&serv_addr.sin_addr.s_addr,
-           (char *)server->h_addr,
-           server->h_length);
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
     serv_addr.sin_port = htons(port);
-
+    bcopy((char *)server->h_addr,
+            (char *)&serv_addr.sin_addr.s_addr,
+           server->h_length);
     return serv_addr;
 }
 
@@ -207,7 +207,6 @@ std::string sanitizeMsg(std::string msg)
     else {
         return msg;
     }
-    
 }
 
 void CONNECT(std::string ip, std::string port, fd_set &open)
@@ -215,18 +214,19 @@ void CONNECT(std::string ip, std::string port, fd_set &open)
     int servSocket;
     struct sockaddr_in sk_addr;
 
-    servSocket = socket(AF_INET, SOCK_STREAM, 0);
     sk_addr = getSockaddr_in(ip.c_str(), stoi(port));
 
     servSocket = open_socket(stoi(port));
-    if(connect(servSocket, (struct sockaddr *)&sk_addr, sizeof(sk_addr)) >= 0)
+    int n = connect(servSocket, (struct sockaddr *)&sk_addr, sizeof(sk_addr));
+    std::cout << n << std::endl;
+    if(n >= 0)
     {
         std::cout << "Succesfully connected to server: " << ip << " on port " << port << std::endl;
         FD_SET(servSocket, &open);
         servers[servSocket] = new Server(servSocket, ip, port);
     }
     else {
-        std::cout << "connection failed" << std::endl;
+        perror("Connection failed");
     }
 }
 
@@ -251,7 +251,6 @@ void newServerConnection(int sock, fd_set &open, fd_set &read)
     socklen_t serverAddress_size;
     char address[INET_ADDRSTRLEN];
     std::string ip, port, listServers = "LISTSERVERS,P3_GROUP_2",stuffedLS;
-
     if(FD_ISSET(sock, &read)) 
     {
         if(servers.size() < 5)
@@ -274,29 +273,26 @@ void newServerConnection(int sock, fd_set &open, fd_set &read)
 void handleClientCommand(fd_set &open, fd_set &read)
 {
     char buf[1024];
+    
     int n;
     for(const auto& pair: clients)
     {
         int sock = pair.second->sock;
         bool isActive = true;
-        std::cout <<  "IN FOR" << std::endl;
         if(FD_ISSET(sock, &read))
         {
-            std::cout <<  "IN IF ISSET" << std::endl;
             n = recv(sock, buf, sizeof(buf), MSG_DONTWAIT);
-            std::cout <<  "N: " << n << std::endl;
             if (n >= 0)
             {   
                 std::string str(buf);
                 std::vector<std::string> tokens = splitBuffer(str);
 
-                std::cout << "str" << str << std::endl;
                 if(tokens[0].compare("CONNECT") == 0 && tokens.size() == 3)
                 {
                     std::string ip = tokens[1];
+                    tokens[2].erase(std::remove(tokens[2].begin(), tokens[2].end(), '\n'), tokens[2].end());
                     std::string port = tokens[2];
                     CONNECT(ip, port, open);
-                    std::cout << "in here" << std::endl;
                 }
             } else {
                 isActive = false;
@@ -333,7 +329,6 @@ int main(int argc, char *argv[])
         printf("Usage: ./P3_GROUP_2 <serverPort> <clientPort>\n");
         exit(0);
     }
-
     clientPort = atoi(argv[2]);
     serverPort = atoi(argv[1]);
     // Setup socket for server to listen to
@@ -343,9 +338,7 @@ int main(int argc, char *argv[])
     FD_ZERO(&openSockets);
     FD_SET(clientSock, &openSockets);
     FD_SET(serverSock, &openSockets);
-
     finished = false;
-
     while (!finished)
     {
         // Get modifiable copy of readSockets
