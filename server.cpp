@@ -80,7 +80,7 @@ class Server{
 
 std::map<int, Client* > clients; // Lookup table for connected clients.
 std::map<int, Server* > servers; // Lookup table for connected servers;
-
+std::string server_id;
 
 int open_socket(int portno)
 {
@@ -168,10 +168,18 @@ void closeClient(int clientSocket, fd_set *openSockets)
     }
     clients.erase(clientFd);
     // And remove from the list of open sockets.
-    FD_CLR(clientFd, openSockets);
-    close(clientFd);    
+    FD_CLR(clientSocket, openSockets);
+    close(clientSocket);    
 }
 
+void closeServer(int serverSocket, fd_set *openSockets)
+{
+    // Remove client from the clients list
+    servers.erase(serverSocket);
+    // And remove from the list of open sockets.
+    FD_CLR(serverSocket, openSockets);
+    close(serverSocket);    
+}
 //Adds SoH and EoT to string before sending
 std::string addToString(std::string msg)
 {
@@ -302,7 +310,56 @@ void handleClientCommand(fd_set &open, fd_set &read)
         }
     }
 }
-
+std::string LISTSERVERS(int sock)
+{
+    std::string str = "SERVERS,";
+    str += clients[sock]->name + ",hommi,;";
+     
+    for (auto const &c : servers)
+    {
+        Server *cl = c.second;
+        if(cl->groupName != "P3_GROUP_2")
+        {
+            str += cl->groupName + "," + cl->ip + "," + cl->port + ";";
+        }
+        
+    }
+    std::cout << str << std::endl;
+    return addToString(str);
+}
+void handleServerCommand(fd_set &open_set, fd_set &read_set)
+{
+    char buf[1024];
+    char msg[1024];
+    int n;
+    for(const auto& pair: servers)
+    {
+        int sock = pair.second->sock;
+        bool isActive = true;
+        if(FD_ISSET(sock, &read_set))
+        {
+            
+            n = read(sock,buf,sizeof(buf));
+            if (n >= 0)
+            {   
+                std::string str(buf);
+                std::vector<std::string> tokens = splitBuffer(str);
+                if (tokens[0].compare("LISTSERVERS") == 0)
+                {  
+                    strcpy(msg, LISTSERVERS(sock).c_str());
+                    send(sock, msg, strlen(msg), 0);
+                }
+                std::cout << str << std::endl;
+            } else {
+                isActive = false;
+            }
+        }
+        if(!isActive)
+        {
+            closeServer(sock, &open_set);
+        }
+    }
+}
 
 // Process command from client on the server
 void clientCommand(int connSocket, fd_set *openSockets, char *buffer)
@@ -318,13 +375,14 @@ int main(int argc, char *argv[])
     fd_set openSockets, readSockets;
     char buffer[1025]; // buffer for reading from clients
 
-    if (argc != 3)
+    if (argc != 4)
     {
-        printf("Usage: ./P3_GROUP_2 <serverPort> <clientPort>\n");
+        printf("Usage: ./P3_GROUP_2 <serverPort> <clientPort> <serverId>\n");
         exit(0);
     }
     clientPort = atoi(argv[2]);
     serverPort = atoi(argv[1]);
+    server_id = argv[4];
     // Setup socket for server to listen to
     serverSock = open_socket(serverPort);
     clientSock = open_socket(clientPort);
@@ -362,7 +420,7 @@ int main(int argc, char *argv[])
             //Handle new connection from server
             newServerConnection(serverSock, openSockets, readSockets);
             //Handle command from connected servers
-            //handleServerCommand(openSockets, readSockets);  
+            handleServerCommand(openSockets, readSockets);  
             //Handle command from connected clients
             handleClientCommand(openSockets, readSockets);
         }
