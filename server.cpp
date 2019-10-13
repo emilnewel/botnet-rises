@@ -158,12 +158,21 @@ struct sockaddr_in getSockaddr_in(const char *host, int port) {
     return serv_addr;
 }
 
-void closeClient(int connSocket, fd_set *openSockets)
+void closeClient(int clientSocket, fd_set *openSockets)
 {
+    int clientFd;
     // Remove client from the clients list
-    clients.erase(connSocket);
+    for(const auto& pair: clients)
+    {
+        if(pair.second->sock == clientSocket)
+        {
+            clientFd = pair.first;
+        }
+    }
+    clients.erase(clientFd);
     // And remove from the list of open sockets.
-    FD_CLR(connSocket, openSockets);
+    FD_CLR(clientSocket, openSockets);
+    close(clientSocket);    
 }
 
 //Adds SoH and EoT to string before sending
@@ -266,7 +275,6 @@ void handleClientCommand(fd_set &open, fd_set &read)
 {
     char buf[1024];
     int n;
-    std::cout <<  "IN HANDLECLIENT" << std::endl;
     for(const auto& pair: clients)
     {
         int sock = pair.second->sock;
