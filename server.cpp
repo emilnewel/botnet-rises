@@ -218,15 +218,9 @@ void CONNECT(std::string ip, std::string port, fd_set &open)
     int n = connect(servSocket, (struct sockaddr *)&sk_addr, sizeof(sk_addr));
     if(n >= 0)
     {
+        std::cout << "Succesfully connected to server: " << ip << " on port " << port << std::endl;
         FD_SET(servSocket, &open);
         servers[servSocket] = new Server(servSocket, ip, port);
-        char buf[100];
-        int n = recv(servSocket, buf, sizeof(buf), MSG_DONTWAIT);
-        std::cout << n << std::endl;
-        if(n > 0){
-            std::string str(buf);
-            std::cout << str << std::endl;
-        }
     }
     else {
         perror("Connection failed");
