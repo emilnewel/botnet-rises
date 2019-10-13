@@ -106,18 +106,19 @@ int open_socket(int portno)
 
     // Turn on SO_REUSEADDR to allow socket to be quickly reused after
     // program exit.
-
-    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &set, sizeof(set)) < 0)
-    {
-        perror("Failed to set SO_REUSEADDR:");
-    }
-    set = 1;
 #ifdef __APPLE__
     if (setsockopt(sock, SOL_SOCKET, SOCK_NONBLOCK, &set, sizeof(set)) < 0)
     {
         perror("Failed to set SOCK_NOBBLOCK");
     }
+#else
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &set, sizeof(set)) < 0)
+    {
+        perror("Failed to set SO_REUSEADDR:");
+    }
 #endif
+    set = 1;
+
     memset(&sk_addr, 0, sizeof(sk_addr));
 
     sk_addr.sin_family = AF_INET;
@@ -129,11 +130,6 @@ int open_socket(int portno)
     if (bind(sock, (struct sockaddr *)&sk_addr, sizeof(sk_addr)) < 0)
     {
         perror("Failed to bind to socket:");
-        return (-1);
-    }
-    if (listen(sock, BACKLOG) < 0)
-    {
-        printf("Listen failed on port %d\n", portno);
         return (-1);
     }
     return (sock);
@@ -160,6 +156,7 @@ struct sockaddr_in getSockaddr_in(const char *host, int port) {
 
 void closeClient(int clientSocket, fd_set *openSockets)
 {
+    std::cout << "HAHA CLOSED" << std::endl;
     int clientFd;
     // Remove client from the clients list
     for(const auto& pair: clients)
@@ -171,8 +168,8 @@ void closeClient(int clientSocket, fd_set *openSockets)
     }
     clients.erase(clientFd);
     // And remove from the list of open sockets.
-    FD_CLR(clientSocket, openSockets);
-    close(clientSocket);    
+    FD_CLR(clientFd, openSockets);
+    close(clientFd);    
 }
 
 //Adds SoH and EoT to string before sending
@@ -217,13 +214,19 @@ void CONNECT(std::string ip, std::string port, fd_set &open)
     sk_addr = getSockaddr_in(ip.c_str(), stoi(port));
 
     servSocket = open_socket(stoi(port));
+    std::cout << servSocket << std::endl;
     int n = connect(servSocket, (struct sockaddr *)&sk_addr, sizeof(sk_addr));
-    std::cout << n << std::endl;
     if(n >= 0)
     {
-        std::cout << "Succesfully connected to server: " << ip << " on port " << port << std::endl;
         FD_SET(servSocket, &open);
         servers[servSocket] = new Server(servSocket, ip, port);
+        char buf[100];
+        int n = recv(servSocket, buf, sizeof(buf), MSG_DONTWAIT);
+        std::cout << n << std::endl;
+        if(n > 0){
+            std::string str(buf);
+            std::cout << str << std::endl;
+        }
     }
     else {
         perror("Connection failed");
@@ -238,6 +241,7 @@ void newClientConnection(int socket, fd_set &open, fd_set &read)
     
     if(FD_ISSET(socket, &read)) {
         fd = accept(socket, (struct sockaddr *)&clientAddress, &clientAddr_size);
+        std::cout << fd << std::endl;
         clients[fd] = new Client(fd);
         FD_SET(fd, &open);
         printf("Client connected on socket: %d\n", socket);
@@ -305,10 +309,6 @@ void handleClientCommand(fd_set &open, fd_set &read)
     }
 }
 
-// Close a client's connection, remove it from the client list, and
-// tidy up select sockets afterwards.
-
-
 
 // Process command from client on the server
 void clientCommand(int connSocket, fd_set *openSockets, char *buffer)
@@ -335,6 +335,17 @@ int main(int argc, char *argv[])
     serverSock = open_socket(serverPort);
     clientSock = open_socket(clientPort);
 
+    if (listen(serverSock, BACKLOG) < 0)
+    {
+        printf("Listen failed on port %d\n", serverPort);
+        return (-1);
+    }
+    if (listen(clientSock, BACKLOG) < 0)
+    {
+        printf("Listen failed on port %d\n", clientPort);
+        return (-1);
+    }
+
     FD_ZERO(&openSockets);
     FD_SET(clientSock, &openSockets);
     FD_SET(serverSock, &openSockets);
@@ -360,7 +371,6 @@ int main(int argc, char *argv[])
             //handleServerCommand(openSockets, readSockets);  
             //Handle command from connected clients
             handleClientCommand(openSockets, readSockets);
-            // Now check for commands from clients
         }
     }
 }
