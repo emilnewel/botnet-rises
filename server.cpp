@@ -49,7 +49,7 @@ public:
     Client(int socket) : sock(socket) 
     {
         this->sock = socket;
-        this->name = "";
+        this->name = "test";
     }
 
     ~Client() {} // Virtual destructor defined for base class
@@ -80,7 +80,6 @@ class Server{
 
 std::map<int, Client* > clients; // Lookup table for connected clients.
 std::map<int, Server* > servers; // Lookup table for connected servers;
-std::string server_id;
 
 int open_socket(int portno)
 {
@@ -221,7 +220,7 @@ void CONNECT(std::string ip, std::string port, fd_set &open)
 
     sk_addr = getSockaddr_in(ip.c_str(), stoi(port));
 
-    servSocket = open_socket(stoi(port));
+    servSocket = socket(AF_INET, SOCK_STREAM, 0);
     std::cout << servSocket << std::endl;
     int n = connect(servSocket, (struct sockaddr *)&sk_addr, sizeof(sk_addr));
     if(n >= 0)
@@ -270,6 +269,7 @@ void newServerConnection(int sock, fd_set &open, fd_set &read)
             printf("Server connected on socket: %d\n", sock);
             listServers = "LISTSERVERS,P3_GROUP_2";
             stuffedLS = addToString(listServers);
+            std::cout << "FROM: " << stuffedLS << std::endl;
             send(servSocket, stuffedLS.c_str(), stuffedLS.length(),0);
 
         }
@@ -309,12 +309,13 @@ void handleClientCommand(fd_set &open, fd_set &read)
             closeClient(sock, &open);
         }
     }
+    
 }
 std::string LISTSERVERS(int sock)
 {
     std::string str = "SERVERS,";
-    str += clients[sock]->name + ",hommi,;";
-     
+    std::cout << servers.size() << std::endl;
+    
     for (auto const &c : servers)
     {
         Server *cl = c.second;
@@ -334,22 +335,24 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
     int n;
     for(const auto& pair: servers)
     {
+        std::cout << servers.size() << std::endl;
         int sock = pair.second->sock;
         bool isActive = true;
         if(FD_ISSET(sock, &read_set))
         {
-            
+            memset(buf, 0, sizeof(buf));
             n = read(sock,buf,sizeof(buf));
             if (n >= 0)
-            {   
-                std::string str(buf);
-                std::vector<std::string> tokens = splitBuffer(str);
+            {
+                std::string clean = sanitizeMsg(buf);
+                std::vector<std::string> tokens = splitBuffer(clean);
+                std::cout << std::endl << "TO: " << clean << std::endl;
                 if (tokens[0].compare("LISTSERVERS") == 0)
-                {  
+                {
                     strcpy(msg, LISTSERVERS(sock).c_str());
+                    std::cout << "FROM: " << msg << std::endl;
                     send(sock, msg, strlen(msg), 0);
                 }
-                std::cout << str << std::endl;
             } else {
                 isActive = false;
             }
@@ -375,14 +378,13 @@ int main(int argc, char *argv[])
     fd_set openSockets, readSockets;
     char buffer[1025]; // buffer for reading from clients
 
-    if (argc != 4)
+    if (argc != 3)
     {
-        printf("Usage: ./P3_GROUP_2 <serverPort> <clientPort> <serverId>\n");
+        printf("Usage: ./P3_GROUP_2 <serverPort> <clientPort>\n");
         exit(0);
     }
     clientPort = atoi(argv[2]);
     serverPort = atoi(argv[1]);
-    server_id = argv[4];
     // Setup socket for server to listen to
     serverSock = open_socket(serverPort);
     clientSock = open_socket(clientPort);
