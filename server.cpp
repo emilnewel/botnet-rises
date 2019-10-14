@@ -442,6 +442,13 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
                         send(sock, message.c_str(), strlen(message.c_str()), 0);
                     }
                 }
+                else if(tokens[0].compare("KEEPALIVE") == 0){
+                    if(stoi(tokens[1]) > 0){
+                        std::string retMsg = servers[sock]->messages.back();
+                        send(sock, retMsg.c_str(),strlen(retMsg.c_str()), 0);
+                        servers[sock]->messages.pop_back();
+                    }
+                }
             } else {
                 isActive = false;
             }
