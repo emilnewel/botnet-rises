@@ -62,6 +62,7 @@ class Server{
         std::string groupName;
         std::string ip;
         std::string port;
+        std::chrono::high_resolution_clock::time_point lastActive;
         std::vector<std::string> messages;
         
         Server(int socket, std::string ip, std::string port)
@@ -70,6 +71,7 @@ class Server{
             this->ip = ip;
             this->port = port;
             this->groupName = "";
+            this->lastActive = std::chrono::system_clock::now();
         }
 
         ~Server(){}
@@ -224,11 +226,11 @@ void closeClient(int clientSocket, fd_set *openSockets)
         if(pair.second->sock == clientSocket)
         {
             clientFd = pair.first;
-            clients.erase(clientFd);
-            FD_CLR(clientFd, openSockets);
             std::cout << "Client disconnected: " << clientSocket << std::endl;
         }
     }    
+    clients.erase(clientFd);
+    FD_CLR(clientFd, openSockets);
 }
 
 void closeServer(int serverSocket, fd_set *openSockets)
@@ -330,7 +332,6 @@ void newServerConnection(int sock, fd_set &open, fd_set &read)
             stuffedLS = addToString(listServers);
             std::cout << "OUT: " << stuffedLS << std::endl;
             send(servSocket, stuffedLS.c_str(), stuffedLS.length(),0);
-            sleep(1);
 
         } 
     }
@@ -405,9 +406,10 @@ void handleClientCommand(fd_set &open, fd_set &read)
                     }
                     send(sock, str.c_str(), strlen(str.c_str()), 0);
                 }
-            } else {
+            } 
+            else {
                 close(sock);
-                closeClient(sock, &open);
+                closeClient(pair.first, &open);
             }
         }
     }
@@ -427,6 +429,7 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
             n = read(sock,buf,sizeof(buf));
             if (n >= 0)
             {
+                servers[sock]->lastActive = std::chrono::system_clock::now();
                 std::string clean = sanitizeMsg(buf);
                 std::vector<std::string> tokens = splitBuffer(clean);
                 std::cout << std::endl << "IN: " << clean << std::endl;
@@ -450,6 +453,7 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
                     }
                 }
                 else if(tokens[0].compare("KEEPALIVE") == 0){
+                    
                     if(stoi(tokens[1]) > 0){
                         std::string getMSG = "GET_MSG,P3_GROUP_2"; 
                         getMSG = addToString(getMSG);
@@ -470,19 +474,21 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
 
                     statusresp = addToString(statusresp);
                     send(sock, statusresp.c_str(), strlen(statusresp.c_str()), 0);
+                }
+                else if(tokens[0].compare("LEAVE"))
+                {
+                    closeClient(sock, &open_set);
+                    close(sock);
                 }  
                 else{
                     std::string sorry = "SEND_MSG,P3_GROUP_2," + servers[sock]->groupName + ",An error has occured with command " + tokens[0]  +". Please try again.";
                     sorry = addToString(sorry);
                     send(sock, sorry.c_str(), strlen(sorry.c_str()), 0);
                 }
-                else if(tokens[0].compare("LEAVE"))
-                {
-                    closeClient(sock, &open_set);
-                }
+                
             } else {
-                close(sock);
                 closeServer(sock, &open_set);
+                close(sock);
             }
         }
     }
@@ -498,7 +504,7 @@ void keepAlive(fd_set* open_set)
 {  
     while(true)
     {
-        std::this_thread::sleep_for(std::chrono::seconds(10));
+        std::this_thread::sleep_for(std::chrono::seconds(60));
         for (auto const &c : servers)
         {
             
@@ -506,7 +512,7 @@ void keepAlive(fd_set* open_set)
             std::chrono::high_resolution_clock::time_point timeNow = std::chrono::system_clock::now();
             std::chrono::duration<double> diff = timeNow-lastActive;
             std::cout << diff.count();
-            if(diff.count() > 10){
+            if(diff.count() > 120){
                 std::cout << "we are kicking: " << c.second->groupName;
                 LEAVE(c.first, open_set);
                 
