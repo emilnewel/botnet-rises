@@ -217,30 +217,27 @@ struct sockaddr_in getSockaddr_in(const char *host, int port) {
 
 void closeClient(int clientSocket, fd_set *openSockets)
 {
-    int clientFd;
-    // Remove client from the clients list
+    int clientFd = 0;
     for(const auto& pair: clients)
     {
         if(pair.second->sock == clientSocket)
         {
             clientFd = pair.first;
+            clients.erase(clientFd);
+            FD_CLR(clientFd, openSockets);
+            std::cout << "Client disconnected: " << clientSocket << std::endl;
         }
-    }
-    // And remove from the list of open sockets.
-    FD_CLR(clientSocket, openSockets);
-    close(clientSocket);   
-    clients.erase(clientFd);
-    std::cout << "Client disconnected: " << clientSocket << std::endl;
+    }    
 }
 
 void closeServer(int serverSocket, fd_set *openSockets)
 {
     // Remove client from the clients list
     servers.erase(serverSocket);
-    // And remove from the list of open sockets.
     FD_CLR(serverSocket, openSockets);
-    close(serverSocket);    
+    std::cout << "Server disconnected: " << serverSocket << std::endl;  
 }
+
 //Adds SoH and EoT to string before sending
 std::string addToString(std::string msg)
 {
@@ -334,6 +331,8 @@ void newServerConnection(int sock, fd_set &open, fd_set &read)
             std::cout << "OUT: " << stuffedLS << std::endl;
             send(servSocket, stuffedLS.c_str(), stuffedLS.length(),0);
 
+        } else {
+
         }
     }
 }
@@ -346,10 +345,7 @@ std::string LISTSERVERS(int sock)
     for (auto const &c : servers)
     {
         Server *cl = c.second;
-        if(cl->groupName != "P3_GROUP_2")
-        {
-            str += cl->groupName + "," + cl->ip + "," + cl->port + ";";
-        }
+        str += cl->groupName + "," + cl->ip + "," + cl->port + ";";
         
     }
     return str;
@@ -363,7 +359,6 @@ void handleClientCommand(fd_set &open, fd_set &read)
     for(const auto& pair: clients)
     {
         int sock = pair.second->sock;
-        bool isActive = true;
         if(FD_ISSET(sock, &read))
         {
             memset(buf, 0, sizeof(buf));
@@ -389,11 +384,10 @@ void handleClientCommand(fd_set &open, fd_set &read)
                     {
                         if(pair.second->groupName == grp)
                         {
-                            
                             pair.second->messages.push_back(msg);
                         }
                     }
-                    
+
                 }
                 else if(tokens[0].compare("GETMSG") == 0)
                 {
@@ -408,21 +402,14 @@ void handleClientCommand(fd_set &open, fd_set &read)
                     for (auto const &c : servers)
                     {
                         Server *cl = c.second;
-                        if(cl->groupName != "P3_GROUP_2")
-                        {
-                            str += cl->groupName + "," + cl->ip + "," + cl->port + ";";
-                        }
-                        
+                        str += cl->groupName + "," + cl->ip + "," + cl->port + ";";
                     }
                     send(sock, str.c_str(), strlen(str.c_str()), 0);
                 }
             } else {
-                isActive = false;
+                close(sock);
+                closeClient(sock, &open);
             }
-        }
-        if(!isActive)
-        {
-            closeClient(sock, &open);
         }
     }
     
@@ -436,7 +423,6 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
     for(const auto& pair: servers)
     {
         int sock = pair.second->sock;
-        bool isActive = true;
         if(FD_ISSET(sock, &read_set))
         {
             memset(buf, 0, sizeof(buf));
@@ -477,12 +463,9 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
                     myMessages.push_back(newMsg);
                 }
             } else {
-                isActive = false;
+                close(sock);
+                closeServer(sock, &open_set);
             }
-        }
-        if(!isActive)
-        {
-            closeServer(sock, &open_set);
         }
     }
 }
@@ -542,8 +525,6 @@ int main(int argc, char *argv[])
         // Get modifiable copy of readSockets
         readSockets = openSockets;
         memset(buffer, 0, sizeof(buffer));
-
-        
 
         if (select(FD_SETSIZE, &readSockets, NULL, 0, NULL) < 0)
         {
