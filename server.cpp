@@ -518,10 +518,6 @@ void keepAlive(fd_set* open_set)
         } 
     }
 }
-<<<<<<< HEAD
-
-=======
->>>>>>> 5d5879a0191f75c72129eb6e615c1a476cef0300
 
 int main(int argc, char *argv[])
 {
@@ -579,12 +575,9 @@ int main(int argc, char *argv[])
             newServerConnection(serverSock, openSockets, readSockets);
             //Handle command from connected clients
             handleClientCommand(openSockets, readSockets);
-<<<<<<< HEAD
             //Handle command from connected servers
             handleServerCommand(openSockets, readSockets);  
             
-=======
->>>>>>> 5d5879a0191f75c72129eb6e615c1a476cef0300
         }
         
         
