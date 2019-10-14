@@ -368,7 +368,6 @@ void handleClientCommand(fd_set &open, fd_set &read)
 
                     for(const auto& pair: servers)
                     {
-                        
                         if(pair.second->groupName == grp)
                         {
                             
@@ -435,16 +434,14 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
                     strcpy(msg, LISTSERVERS(sock).c_str());
                     std::cout << "OUT: " << msg << std::endl;
                     send(sock, msg, strlen(msg), 0);
-                    sleep(1);
-                    std::cout << "OUT: LISTSERVERS,P3_GROUP_2" << std::endl;
-                    send(sock, "\1LISTSERVERS,P3_GROUP_2\4", strlen("\1LISTSERVERS,P3_GROUP_2\4"),0);
                 }
                 else if(tokens[0].compare("GET_MSG") == 0)
                 {
                     if(servers[sock]->messages.size() > 0)
                     {
-                        std::string tmp = servers[sock]->messages.back();
+                        std::string tmp = "SEND_MSG,P3_GROUP_2," + servers[sock]->groupName + "," + servers[sock]->messages.back();
                         servers[sock]->messages.pop_back();
+                        std::cout << "OUT: " << tmp << std::endl;
                         std::string message = addToString(tmp);
                         send(sock, message.c_str(), strlen(message.c_str()), 0);
                     }
