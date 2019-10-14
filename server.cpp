@@ -316,7 +316,7 @@ void newServerConnection(int sock, fd_set &open, fd_set &read)
 {
     int servSocket;
     struct sockaddr_in serverAddress;
-    socklen_t serverAddress_size;
+    socklen_t serverAddress_size = sizeof(serverAddress);
     char address[INET_ADDRSTRLEN];
     std::string ip, port, listServers = "LISTSERVERS,P3_GROUP_2",stuffedLS;
     if(FD_ISSET(sock, &read)) 
@@ -328,6 +328,7 @@ void newServerConnection(int sock, fd_set &open, fd_set &read)
             port = std::to_string(serverAddress.sin_port);
             inet_ntop(AF_INET,&(serverAddress.sin_addr), address, INET_ADDRSTRLEN);
             ip = address;
+            std::cout << "CONNECTED IP: " << address << ", CONNECTED  PORT: " << port << std::endl;
             servers[servSocket] = new Server(servSocket, ip, port);
             printf("Server connected on socket: %d\n", sock);
             listServers = "LISTSERVERS,P3_GROUP_2";
@@ -337,6 +338,23 @@ void newServerConnection(int sock, fd_set &open, fd_set &read)
 
         }
     }
+}
+
+std::string LISTSERVERS(int sock)
+{
+    std::string str = "SERVERS,P3_GROUP_2,";
+    str += myIp() + "," + std::to_string(serverPort) + ";";
+    
+    for (auto const &c : servers)
+    {
+        Server *cl = c.second;
+        if(cl->groupName != "P3_GROUP_2")
+        {
+            str += cl->groupName + "," + cl->ip + "," + cl->port + ";";
+        }
+        
+    }
+    return str;
 }
 
 void handleClientCommand(fd_set &open, fd_set &read)
@@ -350,6 +368,7 @@ void handleClientCommand(fd_set &open, fd_set &read)
         bool isActive = true;
         if(FD_ISSET(sock, &read))
         {
+            memset(buf, 0, sizeof(buf));
             n = recv(sock, buf, sizeof(buf), MSG_DONTWAIT);
             if (n >= 0)
             {   
@@ -378,11 +397,26 @@ void handleClientCommand(fd_set &open, fd_set &read)
                     }
                     
                 }
-                else if(tokens[0].compare("GETMSG") == 0){
+                else if(tokens[0].compare("GETMSG") == 0)
+                {
                     std::string retMSG = myMessages.back();
                     send(sock, retMSG.c_str(), strlen(retMSG.c_str()), 0);
                     myMessages.pop_back();
-
+                }
+                else if( strncmp(buf, "LISTSERVERS", 11) == 0)
+                {
+                    std::string str = "SERVERS,P3_GROUP_2,";
+                    str += myIp() + "," + std::to_string(serverPort) + ";";
+                    for (auto const &c : servers)
+                    {
+                        Server *cl = c.second;
+                        if(cl->groupName != "P3_GROUP_2")
+                        {
+                            str += cl->groupName + "," + cl->ip + "," + cl->port + ";";
+                        }
+                        
+                    }
+                    send(sock, str.c_str(), strlen(str.c_str()), 0);
                 }
             } else {
                 isActive = false;
@@ -395,22 +429,7 @@ void handleClientCommand(fd_set &open, fd_set &read)
     }
     
 }
-std::string LISTSERVERS(int sock)
-{
-    std::string str = "SERVERS,P3_GROUP_2,";
-    str += myIp() + "," + std::to_string(serverPort) + ";";
-    
-    for (auto const &c : servers)
-    {
-        Server *cl = c.second;
-        if(cl->groupName != "P3_GROUP_2")
-        {
-            str += cl->groupName + "," + cl->ip + "," + cl->port + ";";
-        }
-        
-    }
-    return addToString(str);
-}
+
 void handleServerCommand(fd_set &open_set, fd_set &read_set)
 {
     char buf[1024];
@@ -432,8 +451,8 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
                 if (tokens[0].compare("LISTSERVERS") == 0)
                 {
                     servers[sock]->groupName = tokens[1];
-                    
-                    strcpy(msg, LISTSERVERS(sock).c_str());
+                    std::string sendStr = LISTSERVERS(sock);
+                    strcpy(msg, addToString( sendStr ).c_str() );
                     std::cout << "OUT: " << msg << std::endl;
                     send(sock, msg, strlen(msg), 0);
                 }
