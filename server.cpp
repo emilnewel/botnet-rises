@@ -428,6 +428,7 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
                     strcpy(msg, LISTSERVERS(sock).c_str());
                     std::cout << "OUT: " << msg << std::endl;
                     send(sock, msg, strlen(msg), 0);
+                    sleep(1);
                     std::cout << "OUT: LISTSERVERS,P3_GROUP_2" << std::endl;
                     send(sock, "\1LISTSERVERS,P3_GROUP_2\4", strlen("\1LISTSERVERS,P3_GROUP_2\4"),0);
                 }
@@ -450,12 +451,6 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
             closeServer(sock, &open_set);
         }
     }
-}
-
-// Process command from client on the server
-void clientCommand(int connSocket, fd_set *openSockets, char *buffer)
-{
-    std::vector<std::string> tokens = splitBuffer(sanitizeMsg(buffer));    
 }
 
 void keepAlive()
