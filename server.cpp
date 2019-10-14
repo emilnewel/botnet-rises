@@ -368,7 +368,19 @@ void clientCommand(int connSocket, fd_set *openSockets, char *buffer)
 {
     std::vector<std::string> tokens = splitBuffer(sanitizeMsg(buffer));    
 }
-
+void keepAlive()
+{   
+    while(true)
+    {
+        std::this_thread::sleep_for(std::chrono::seconds(120));
+        std::string kaCommand = addToString("KEEPALIVE,0");
+        for (auto const &c : servers)
+        {
+            send(c.first, kaCommand.c_str(), strlen(kaCommand.c_str()), 0);
+        }
+        
+    }
+}
 int main(int argc, char *argv[])
 {
     bool finished;
@@ -403,6 +415,9 @@ int main(int argc, char *argv[])
     FD_SET(clientSock, &openSockets);
     FD_SET(serverSock, &openSockets);
     finished = false;
+
+    std::thread(keepAlive).detach();
+
     while (!finished)
     {
         // Get modifiable copy of readSockets
