@@ -155,7 +155,6 @@ struct sockaddr_in getSockaddr_in(const char *host, int port) {
 
 void closeClient(int clientSocket, fd_set *openSockets)
 {
-    std::cout << "HAHA CLOSED" << std::endl;
     int clientFd;
     // Remove client from the clients list
     for(const auto& pair: clients)
@@ -165,10 +164,11 @@ void closeClient(int clientSocket, fd_set *openSockets)
             clientFd = pair.first;
         }
     }
-    clients.erase(clientFd);
     // And remove from the list of open sockets.
     FD_CLR(clientSocket, openSockets);
-    close(clientSocket);    
+    close(clientSocket);   
+    clients.erase(clientFd);
+    std::cout << "Client disconnected: " << clientSocket << std::endl;
 }
 
 void closeServer(int serverSocket, fd_set *openSockets)
@@ -205,7 +205,7 @@ std::string sanitizeMsg(std::string msg)
     std::string cleanMsg;
     if(msg[0] == '\1')
     {
-        cleanMsg = msg.substr(1, msg.length() - 1);
+        cleanMsg = msg.substr(1, msg.length() - 2);
         return cleanMsg;    
     }
     else {
@@ -221,8 +221,6 @@ void CONNECT(std::string ip, std::string port, fd_set &open)
     sk_addr = getSockaddr_in(ip.c_str(), stoi(port));
 
     servSocket = socket(AF_INET, SOCK_STREAM, 0);
-    
-    std::cout << servSocket << std::endl;
     int n = connect(servSocket, (struct sockaddr *)&sk_addr, sizeof(sk_addr));
     if(n >= 0)
     {
@@ -243,7 +241,6 @@ void newClientConnection(int socket, fd_set &open, fd_set &read)
     
     if(FD_ISSET(socket, &read)) {
         fd = accept(socket, (struct sockaddr *)&clientAddress, &clientAddr_size);
-        std::cout << fd << std::endl;
         clients[fd] = new Client(fd);
         FD_SET(fd, &open);
         printf("Client connected on socket: %d\n", socket);
@@ -315,7 +312,6 @@ void handleClientCommand(fd_set &open, fd_set &read)
 std::string LISTSERVERS(int sock)
 {
     std::string str = "SERVERS,";
-    std::cout << servers.size() << std::endl;
     
     for (auto const &c : servers)
     {
