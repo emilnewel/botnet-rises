@@ -62,7 +62,6 @@ class Server{
         std::string groupName;
         std::string ip;
         std::string port;
-        std::chrono::high_resolution_clock::time_point lastActive;
         std::vector<std::string> messages;
         
         Server(int socket, std::string ip, std::string port)
@@ -70,7 +69,6 @@ class Server{
             this->sock = socket;
             this->ip = ip;
             this->port = port;
-            this->lastActive = std::chrono::system_clock::now();
             this->groupName = "";
         }
 
@@ -140,6 +138,7 @@ int open_socket(int portno)
     }
     return (sock);
 }
+
 std::string myIp()
 {
     struct ifaddrs *myaddrs, *ifa;
@@ -325,17 +324,15 @@ void newServerConnection(int sock, fd_set &open, fd_set &read)
             port = std::to_string(serverAddress.sin_port);
             inet_ntop(AF_INET,&(serverAddress.sin_addr), address, INET_ADDRSTRLEN);
             ip = address;
-            std::cout << "CONNECTED IP: " << address << ", CONNECTED  PORT: " << port << std::endl;
             servers[servSocket] = new Server(servSocket, ip, port);
             printf("Server connected on socket: %d\n", sock);
             listServers = "LISTSERVERS,P3_GROUP_2";
             stuffedLS = addToString(listServers);
             std::cout << "OUT: " << stuffedLS << std::endl;
             send(servSocket, stuffedLS.c_str(), stuffedLS.length(),0);
+            sleep(1);
 
-        } else {
-
-        }
+        } 
     }
 }
 
@@ -454,16 +451,26 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
                     }
                 }
                 else if(tokens[0].compare("KEEPALIVE") == 0){
-                    servers[sock]->lastActive = std::chrono::system_clock::now();
                     if(stoi(tokens[1]) > 0){
                         std::string getMSG = "GET_MSG,P3_GROUP_2"; 
                         getMSG = addToString(getMSG);
                         send(sock, getMSG.c_str(),strlen(getMSG.c_str()), 0);
                     }
-                }
+                }   
                 else if(tokens[0].compare("SEND_MSG") == 0){
                     std::string newMsg = "Message from: " + tokens[1] + "\nMessage: " + tokens[3] + "\n";
                     myMessages.push_back(newMsg);
+                } 
+                else if(tokens[0].compare("STATUSREQ") == 0){
+                    std::string statusresp = "STATUSRESP,";
+
+                    for(const auto& pair: servers)
+                    {
+                        statusresp += pair.second->groupName + "," + std::to_string(pair.second->messages.size()) + ",";
+                    }
+
+                    statusresp = addToString(statusresp);
+                    send(sock, statusresp.c_str(), strlen(statusresp.c_str()), 0);
                 }
             } else {
                 close(sock);
@@ -487,22 +494,6 @@ void keepAlive()
         } 
     }
 }
-void checkActivity()
-{  
-    std::cout << "HOMMI"();
-    for (auto const &c : servers)
-    {
-        std::chrono::high_resolution_clock::time_point lastActive = c.second->lastActive;
-        std::chrono::high_resolution_clock::time_point timeNow = std::chrono::system_clock::now();
-        std::chrono::duration<double> diff = timeNow-lastActive;
-        std::cout << "time since last: " << diff.count();
-        if(diff.count() > 10){
-            //LEAVE now
-            std::cout << "we should kick " << c.second->groupName;
-        } 
-
-    }
-}
 
 int main(int argc, char *argv[])
 {
@@ -511,12 +502,12 @@ int main(int argc, char *argv[])
     fd_set openSockets, readSockets;
     char buffer[1025]; // buffer for reading from clients
 
-    if (argc != 3)
+    if (argc != 2)
     {
-        printf("Usage: ./P3_GROUP_2 <serverPort> <clientPort>\n");
+        printf("Usage: ./P3_GROUP_2 <serverPort>\n");
         exit(0);
     }
-    clientPort = atoi(argv[2]);
+    clientPort = 4093;                      //Hardcoded client port - CHANGE THIS IF PORT IS TAKEN
     serverPort = atoi(argv[1]);
     // Setup socket for server to listen to
     serverSock = open_socket(serverPort);
@@ -560,8 +551,6 @@ int main(int argc, char *argv[])
             handleServerCommand(openSockets, readSockets);  
             //Handle command from connected clients
             handleClientCommand(openSockets, readSockets);
-            // checks if all servers are Active
-            checkActivity();
         }
     }
 }
