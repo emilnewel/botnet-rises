@@ -20,7 +20,8 @@
 #include <algorithm>
 #include <map>
 #include <vector>
-
+#include <ifaddrs.h>
+#include <net/if.h>
 #include <iostream>
 #include <sstream>
 #include <thread>
@@ -80,6 +81,7 @@ class Server{
 
 std::map<int, Client* > clients; // Lookup table for connected clients.
 std::map<int, Server* > servers; // Lookup table for connected servers;
+int clientPort, serverPort;
 
 int open_socket(int portno)
 {
@@ -132,6 +134,63 @@ int open_socket(int portno)
         return (-1);
     }
     return (sock);
+}
+std::string myIp()
+{
+    struct ifaddrs *myaddrs, *ifa;
+    void *in_addr;
+    char buf[64];
+    std::string output = "";
+
+    // get every ip address and put them in a linked list
+    if(getifaddrs(&myaddrs) != 0)
+    {
+        perror("getifaddrs");
+        exit(1);
+    }
+    // for every ip address in the linked list
+    for(ifa = myaddrs; ifa != NULL; ifa = ifa->ifa_next)
+    {
+        // safety checks
+        if (ifa->ifa_addr == NULL)
+            continue;
+        if (!(ifa->ifa_flags & IFF_UP))
+            continue;
+
+        switch (ifa->ifa_addr->sa_family)
+        {
+            // if its IPv4 then we look further
+            case AF_INET:
+            {
+                struct sockaddr_in *s4 = (struct sockaddr_in *)ifa->ifa_addr;
+                in_addr = &s4->sin_addr;
+                break;
+            }
+            // we are not interested in IPv6 (sorry...)
+            case AF_INET6:
+            {
+                continue;
+            }
+            default:
+                continue;
+        }
+
+        // we put our IPv4 into char buffer for output
+        if (!inet_ntop(ifa->ifa_addr->sa_family, in_addr, buf, sizeof(buf)))
+        {
+            printf("%s: inet_ntop failed!\n", ifa->ifa_name);
+        }
+        // make sure we aren't looking at localhost
+        else if (std::string(buf).compare("127.0.0.1") != 0)
+        {
+            // this assumes there are at most two ip addresses and that one of them is localhost
+            output = std::string(buf);
+            break;
+        }
+    }
+
+    freeifaddrs(myaddrs);
+    return output;
 }
 
 struct sockaddr_in getSockaddr_in(const char *host, int port) {
@@ -205,7 +264,8 @@ std::string sanitizeMsg(std::string msg)
     std::string cleanMsg;
     if(msg[0] == '\1')
     {
-        cleanMsg = msg.substr(1, msg.length() - 2);
+        cleanMsg = msg.substr(1);
+        cleanMsg.pop_back();
         return cleanMsg;    
     }
     else {
@@ -267,7 +327,7 @@ void newServerConnection(int sock, fd_set &open, fd_set &read)
             printf("Server connected on socket: %d\n", sock);
             listServers = "LISTSERVERS,P3_GROUP_2";
             stuffedLS = addToString(listServers);
-            std::cout << "FROM: " << stuffedLS << std::endl;
+            std::cout << "OUT: " << stuffedLS << std::endl;
             send(servSocket, stuffedLS.c_str(), stuffedLS.length(),0);
 
         }
@@ -311,8 +371,8 @@ void handleClientCommand(fd_set &open, fd_set &read)
 }
 std::string LISTSERVERS(int sock)
 {
-    std::string str = "SERVERS,P3_GROUP_2";
-    std::cout << servers.size() << std::endl;
+    std::string str = "SERVERS,P3_GROUP_2,";
+    str += myIp() + "," + std::to_string(serverPort) + ";";
     
     for (auto const &c : servers)
     {
@@ -323,7 +383,6 @@ std::string LISTSERVERS(int sock)
         }
         
     }
-    std::cout << str << std::endl;
     return addToString(str);
 }
 void handleServerCommand(fd_set &open_set, fd_set &read_set)
@@ -333,7 +392,6 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
     int n;
     for(const auto& pair: servers)
     {
-        std::cout << servers.size() << std::endl;
         int sock = pair.second->sock;
         bool isActive = true;
         if(FD_ISSET(sock, &read_set))
@@ -344,13 +402,16 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
             {
                 std::string clean = sanitizeMsg(buf);
                 std::vector<std::string> tokens = splitBuffer(clean);
-                std::cout << std::endl << "TO: " << clean << std::endl;
+                std::cout << std::endl << "IN: " << clean << std::endl;
                 if (tokens[0].compare("LISTSERVERS") == 0)
                 {
                     servers[sock]->groupName = tokens[1];
+                    
                     strcpy(msg, LISTSERVERS(sock).c_str());
-                    std::cout << "FROM: " << msg << std::endl;
+                    std::cout << "OUT: " << msg << std::endl;
                     send(sock, msg, strlen(msg), 0);
+                    std::cout << "OUT: LISTSERVERS,P3_GROUP_2" << std::endl;
+                    send(sock, "\1LISTSERVERS,P3_GROUP_2\4", strlen("\1LISTSERVERS,P3_GROUP_2\4"),0);
                 }
             } else {
                 isActive = false;
@@ -368,6 +429,7 @@ void clientCommand(int connSocket, fd_set *openSockets, char *buffer)
 {
     std::vector<std::string> tokens = splitBuffer(sanitizeMsg(buffer));    
 }
+
 void keepAlive()
 {   
     while(true)
@@ -381,11 +443,11 @@ void keepAlive()
         
     }
 }
+
 int main(int argc, char *argv[])
 {
     bool finished;
     int clientSock, serverSock;
-    int clientPort, serverPort;
     fd_set openSockets, readSockets;
     char buffer[1025]; // buffer for reading from clients
 
@@ -417,12 +479,13 @@ int main(int argc, char *argv[])
     finished = false;
 
     std::thread(keepAlive).detach();
-
     while (!finished)
     {
         // Get modifiable copy of readSockets
         readSockets = openSockets;
         memset(buffer, 0, sizeof(buffer));
+
+        
 
         if (select(FD_SETSIZE, &readSockets, NULL, 0, NULL) < 0)
         {
