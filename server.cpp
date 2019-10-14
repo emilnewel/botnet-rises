@@ -83,6 +83,7 @@ class Server{
 
 std::map<int, Client* > clients; // Lookup table for connected clients.
 std::map<int, Server* > servers; // Lookup table for connected servers;
+std::vector<std::string> myMessages; // vector to hold messages for my group
 int clientPort, serverPort;
 
 int open_socket(int portno)
@@ -376,6 +377,12 @@ void handleClientCommand(fd_set &open, fd_set &read)
                     }
                     
                 }
+                else if(tokens[0].compare("GETMSG") == 0){
+                    std::string retMSG = myMessages.back();
+                    send(sock, retMSG.c_str(), strlen(retMSG.c_str()), 0);
+                    myMessages.pop_back();
+
+                }
             } else {
                 isActive = false;
             }
@@ -444,10 +451,14 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
                 }
                 else if(tokens[0].compare("KEEPALIVE") == 0){
                     if(stoi(tokens[1]) > 0){
-                        std::string retMsg = servers[sock]->messages.back();
-                        send(sock, retMsg.c_str(),strlen(retMsg.c_str()), 0);
-                        servers[sock]->messages.pop_back();
+                        std::string getMSG = "GET_MSG,P3_GROUP_2"; 
+                        getMSG = addToString(getMSG);
+                        send(sock, getMSG.c_str(),strlen(getMSG.c_str()), 0);
                     }
+                }
+                else if(tokens[0].compare("SEND_MSG") == 0){
+                    std::string newMsg = "Message from: " + tokens[1] + "\nMessage: " + tokens[3] + "\n";
+                    myMessages.push_back(newMsg);
                 }
             } else {
                 isActive = false;
