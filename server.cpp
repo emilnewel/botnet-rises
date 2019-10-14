@@ -429,7 +429,6 @@ void handleClientCommand(fd_set &open, fd_set &read)
     }
     
 }
-
 void handleServerCommand(fd_set &open_set, fd_set &read_set)
 {
     char buf[1024];
@@ -479,6 +478,10 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
                     std::string newMsg = "Message from: " + tokens[1] + "\nMessage: " + tokens[3] + "\n";
                     myMessages.push_back(newMsg);
                 }
+                else if(tokens[0].compare("LEAVE"))
+                {
+                    closeClient(sock, &open_set);
+                }
             } else {
                 isActive = false;
             }
@@ -489,14 +492,30 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
         }
     }
 }
-
-void keepAlive()
+void LEAVE(int sock, fd_set* open_set)
+{
+    std::string tmp = "LEAVE," + myIp() + "," + std::to_string(serverPort);
+    std::string leaveCommand = addToString(tmp);
+    send(sock, leaveCommand.c_str(), strlen(leaveCommand.c_str()), 0);
+    closeServer(sock, open_set);
+}
+void keepAlive(fd_set* open_set)
 {  
     while(true)
     {
-        std::this_thread::sleep_for(std::chrono::seconds(120));
+        std::this_thread::sleep_for(std::chrono::seconds(10));
         for (auto const &c : servers)
         {
+            
+            std::chrono::high_resolution_clock::time_point lastActive = c.second->lastActive;
+            std::chrono::high_resolution_clock::time_point timeNow = std::chrono::system_clock::now();
+            std::chrono::duration<double> diff = timeNow-lastActive;
+            std::cout << diff.count();
+            if(diff.count() > 10){
+                std::cout << "we are kicking: " << c.second->groupName;
+                LEAVE(c.first, open_set);
+                
+            }
             std::string tmp = "KEEPALIVE," + std::to_string(c.second->messages.size());
             std::string kaCommand = addToString(tmp);
             send(c.first, kaCommand.c_str(), strlen(kaCommand.c_str()), 0);
@@ -504,22 +523,7 @@ void keepAlive()
         } 
     }
 }
-void checkActivity()
-{  
-    std::cout << "HOMMI"();
-    for (auto const &c : servers)
-    {
-        std::chrono::high_resolution_clock::time_point lastActive = c.second->lastActive;
-        std::chrono::high_resolution_clock::time_point timeNow = std::chrono::system_clock::now();
-        std::chrono::duration<double> diff = timeNow-lastActive;
-        std::cout << "time since last: " << diff.count();
-        if(diff.count() > 10){
-            //LEAVE now
-            std::cout << "we should kick " << c.second->groupName;
-        } 
 
-    }
-}
 
 int main(int argc, char *argv[])
 {
@@ -555,7 +559,9 @@ int main(int argc, char *argv[])
     FD_SET(serverSock, &openSockets);
     finished = false;
 
-    std::thread(keepAlive).detach();
+    std::thread threadKeepAlive(keepAlive, &openSockets);
+    threadKeepAlive.detach();
+    
     while (!finished)
     {
         // Get modifiable copy of readSockets
@@ -575,12 +581,14 @@ int main(int argc, char *argv[])
             newClientConnection(clientSock, openSockets, readSockets);
             //Handle new connection from server
             newServerConnection(serverSock, openSockets, readSockets);
-            //Handle command from connected servers
-            handleServerCommand(openSockets, readSockets);  
             //Handle command from connected clients
             handleClientCommand(openSockets, readSockets);
-            // checks if all servers are Active
-            checkActivity();
+            //Handle command from connected servers
+            handleServerCommand(openSockets, readSockets);  
+            
         }
+        
+        
+
     }
 }
