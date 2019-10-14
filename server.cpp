@@ -62,6 +62,8 @@ class Server{
         std::string groupName;
         std::string ip;
         std::string port;
+        std::vector<std::string> messages;
+        
         Server(int socket, std::string ip, std::string port)
         {
             this->sock = socket;
@@ -357,6 +359,22 @@ void handleClientCommand(fd_set &open, fd_set &read)
                     tokens[2].erase(std::remove(tokens[2].begin(), tokens[2].end(), '\n'), tokens[2].end());
                     std::string port = tokens[2];
                     CONNECT(ip, port, open);
+                } 
+                else if(tokens[0].compare("SENDMSG") == 0 && tokens.size() == 3)
+                {
+                    std::string grp = tokens[1];
+                    std::string msg = tokens[2];
+
+                    for(const auto& pair: servers)
+                    {
+                        
+                        if(pair.second->groupName == grp)
+                        {
+                            
+                            pair.second->messages.push_back(msg);
+                        }
+                    }
+                    
                 }
             } else {
                 isActive = false;
@@ -413,6 +431,16 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
                     std::cout << "OUT: LISTSERVERS,P3_GROUP_2" << std::endl;
                     send(sock, "\1LISTSERVERS,P3_GROUP_2\4", strlen("\1LISTSERVERS,P3_GROUP_2\4"),0);
                 }
+                else if(tokens[0].compare("GET_MSG") == 0)
+                {
+                    if(servers[sock]->messages.size() > 0)
+                    {
+                        std::string tmp = servers[sock]->messages.back();
+                        servers[sock]->messages.pop_back();
+                        std::string message = addToString(tmp);
+                        send(sock, message.c_str(), strlen(message.c_str()), 0);
+                    }
+                }
             } else {
                 isActive = false;
             }
@@ -431,16 +459,17 @@ void clientCommand(int connSocket, fd_set *openSockets, char *buffer)
 }
 
 void keepAlive()
-{   
+{  
     while(true)
     {
         std::this_thread::sleep_for(std::chrono::seconds(120));
-        std::string kaCommand = addToString("KEEPALIVE,0");
         for (auto const &c : servers)
         {
+            std::string tmp = "KEEPALIVE," + std::to_string(c.second->messages.size());
+            std::string kaCommand = addToString(tmp);
             send(c.first, kaCommand.c_str(), strlen(kaCommand.c_str()), 0);
-        }
-        
+            std::cout << "OUT: " << kaCommand.c_str() << std::endl;
+        } 
     }
 }
 
