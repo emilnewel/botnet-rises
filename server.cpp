@@ -470,6 +470,11 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
 
                     statusresp = addToString(statusresp);
                     send(sock, statusresp.c_str(), strlen(statusresp.c_str()), 0);
+                }  
+                else{
+                    std::string sorry = "SEND_MSG,P3_GROUP_2," + servers[sock]->groupName + ",An error has occured with command " + tokens[0]  +". Please try again.";
+                    sorry = addToString(sorry);
+                    send(sock, sorry.c_str(), strlen(sorry.c_str()), 0);
                 }
                 else if(tokens[0].compare("LEAVE"))
                 {
