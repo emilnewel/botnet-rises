@@ -221,6 +221,7 @@ void CONNECT(std::string ip, std::string port, fd_set &open)
     sk_addr = getSockaddr_in(ip.c_str(), stoi(port));
 
     servSocket = socket(AF_INET, SOCK_STREAM, 0);
+    
     std::cout << servSocket << std::endl;
     int n = connect(servSocket, (struct sockaddr *)&sk_addr, sizeof(sk_addr));
     if(n >= 0)

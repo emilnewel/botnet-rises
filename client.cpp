@@ -92,6 +92,7 @@ int main(int argc, char *argv[])
     serv_addr.sin_port = htons(atoi(argv[2]));
 
     serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    
     // Turn on SO_REUSEADDR to allow socket to be quickly reused after
     // program exit.
 
