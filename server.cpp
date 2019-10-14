@@ -62,6 +62,7 @@ class Server{
         std::string groupName;
         std::string ip;
         std::string port;
+        std::chrono::high_resolution_clock::time_point lastActive;
         std::vector<std::string> messages;
         
         Server(int socket, std::string ip, std::string port)
@@ -69,6 +70,7 @@ class Server{
             this->sock = socket;
             this->ip = ip;
             this->port = port;
+            this->lastActive = std::chrono::system_clock::now();
             this->groupName = "";
         }
 
@@ -452,6 +454,7 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
                     }
                 }
                 else if(tokens[0].compare("KEEPALIVE") == 0){
+                    servers[sock]->lastActive = std::chrono::system_clock::now();
                     if(stoi(tokens[1]) > 0){
                         std::string getMSG = "GET_MSG,P3_GROUP_2"; 
                         getMSG = addToString(getMSG);
@@ -482,6 +485,22 @@ void keepAlive()
             send(c.first, kaCommand.c_str(), strlen(kaCommand.c_str()), 0);
             std::cout << "OUT: " << kaCommand.c_str() << std::endl;
         } 
+    }
+}
+void checkActivity()
+{  
+    std::cout << "HOMMI"();
+    for (auto const &c : servers)
+    {
+        std::chrono::high_resolution_clock::time_point lastActive = c.second->lastActive;
+        std::chrono::high_resolution_clock::time_point timeNow = std::chrono::system_clock::now();
+        std::chrono::duration<double> diff = timeNow-lastActive;
+        std::cout << "time since last: " << diff.count();
+        if(diff.count() > 10){
+            //LEAVE now
+            std::cout << "we should kick " << c.second->groupName;
+        } 
+
     }
 }
 
@@ -541,6 +560,8 @@ int main(int argc, char *argv[])
             handleServerCommand(openSockets, readSockets);  
             //Handle command from connected clients
             handleClientCommand(openSockets, readSockets);
+            // checks if all servers are Active
+            checkActivity();
         }
     }
 }
