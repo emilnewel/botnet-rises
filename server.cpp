@@ -311,12 +311,8 @@ void handleClientCommand(fd_set &open, fd_set &read)
 }
 std::string LISTSERVERS(int sock)
 {
-<<<<<<< HEAD
     std::string str = "SERVERS,P3_GROUP_2";
     std::cout << servers.size() << std::endl;
-=======
-    std::string str = "SERVERS,";
->>>>>>> 23853c871841a9b2831d3cbce1969c5e164a1a2d
     
     for (auto const &c : servers)
     {
@@ -351,7 +347,7 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
                 std::cout << std::endl << "TO: " << clean << std::endl;
                 if (tokens[0].compare("LISTSERVERS") == 0)
                 {
-                    servers[sock]->name = tokens[1];
+                    servers[sock]->groupName = tokens[1];
                     strcpy(msg, LISTSERVERS(sock).c_str());
                     std::cout << "FROM: " << msg << std::endl;
                     send(sock, msg, strlen(msg), 0);
