@@ -26,7 +26,8 @@
 #include <sstream>
 #include <thread>
 #include <map>
-
+#include <fstream>
+#include <ctime>
 #include <unistd.h>
 
 // fix SOCK_NONBLOCK for OSX
@@ -141,6 +142,15 @@ int open_socket(int portno)
     return (sock);
 }
 
+void writeToFile(std::string info)
+{
+    time_t current_time = time(NULL);
+    std::ofstream outfile;
+    outfile.open("info.log", std::ios_base::app);
+    outfile << ctime(&current_time) <<" " << info << std::endl;
+    outfile.close();
+}
+
 std::string myIp()
 {
     struct ifaddrs *myaddrs, *ifa;
@@ -226,11 +236,14 @@ void closeClient(int clientSocket, fd_set *openSockets)
         if(pair.second->sock == clientSocket)
         {
             clientFd = pair.first;
-            std::cout << "Client disconnected: " << clientSocket << std::endl;
+            
         }
     }    
     clients.erase(clientFd);
+    close(clientSocket);
     FD_CLR(clientFd, openSockets);
+    std::cout << "Client disconnected: " << clientSocket << std::endl;
+
 }
 
 void closeServer(int serverSocket, fd_set *openSockets)
@@ -238,6 +251,7 @@ void closeServer(int serverSocket, fd_set *openSockets)
     // Remove client from the clients list
     servers.erase(serverSocket);
     FD_CLR(serverSocket, openSockets);
+    close(serverSocket);
     std::cout << "Server disconnected: " << serverSocket << std::endl;  
 }
 
@@ -261,20 +275,6 @@ std::vector<std::string> splitBuffer(std::string buf)
     return tokens;
 }
 
-//Removes SoH and EoT from string
-std::string sanitizeMsg(std::string msg)
-{
-    std::string cleanMsg;
-    if(msg[0] == '\1')
-    {
-        cleanMsg = msg.substr(1);
-        cleanMsg.pop_back();
-        return cleanMsg;    
-    }
-    else {
-        return msg;
-    }
-}
 
 void CONNECT(std::string ip, std::string port, fd_set &open)
 {
@@ -332,7 +332,6 @@ void newServerConnection(int sock, fd_set &open, fd_set &read)
             stuffedLS = addToString(listServers);
             std::cout << "OUT: " << stuffedLS << std::endl;
             send(servSocket, stuffedLS.c_str(), stuffedLS.length(),0);
-
         } 
     }
 }
@@ -346,7 +345,6 @@ std::string LISTSERVERS(int sock)
     {
         Server *cl = c.second;
         str += cl->groupName + "," + cl->ip + "," + cl->port + ";";
-        
     }
     return str;
 }
@@ -358,6 +356,7 @@ void handleClientCommand(fd_set &open, fd_set &read)
     int n;
     for(const auto& pair: clients)
     {
+        bool isActive = true;
         int sock = pair.second->sock;
         if(FD_ISSET(sock, &read))
         {
@@ -409,9 +408,12 @@ void handleClientCommand(fd_set &open, fd_set &read)
                 }
             } 
             else {
-                close(sock);
-                closeClient(pair.first, &open);
+                isActive = false;
             }
+        }
+        if(!isActive)
+        {
+            closeClient(sock, &open);
         }
     }
     
@@ -419,7 +421,7 @@ void handleClientCommand(fd_set &open, fd_set &read)
 std::vector<std::string> splitAndSnitize(std::string buf){
     std::vector<std::string> ret;
     int lastStart = 0;
-    for(int i = 0; i < buf.size(); i++) {
+    for(unsigned int i = 0; i < buf.size(); i++) {
         if(buf[i] == '\4') {
             ret.push_back(buf.substr(lastStart + 1,i - 1));
             lastStart = i+1;
@@ -434,14 +436,15 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
     char buf[1024];
     char msg[1024];
     int n;
+    
     for(const auto& pair: servers)
     {
+        bool isActive = true;
         int sock = pair.second->sock;
         if(FD_ISSET(sock, &read_set))
         {
             memset(buf, 0, sizeof(buf));
             n = read(sock,buf,sizeof(buf));
-
             if (n >= 0)
             {
                 std::vector<std::string> commands = splitAndSnitize(buf);
@@ -451,21 +454,24 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
                     //std::string clean = sanitizeMsg(buf);
                     std::vector<std::string> tokens = splitBuffer(cmd);
                     std::cout << std::endl << "IN: " << cmd << std::endl;
+                    
                     if (tokens[0].compare("LISTSERVERS") == 0)
                     {
                         servers[sock]->groupName = tokens[1];
                         std::string sendStr = LISTSERVERS(sock);
                         strcpy(msg, addToString( sendStr ).c_str() );
+                        sendStr = addToString(sendStr);
                         std::cout << "OUT: " << msg << std::endl;
                         send(sock, msg, strlen(msg), 0);
                     }
                     else if(tokens[0].compare("GET_MSG") == 0)
                     {
-                        if(servers[sock]->messages.size() > 0)
+                        while(servers[sock]->messages.size() > 0)
                         {
                             std::string tmp = "SEND_MSG,P3_GROUP_2," + servers[sock]->groupName + "," + servers[sock]->messages.back();
                             servers[sock]->messages.pop_back();
                             std::cout << "OUT: " << tmp << std::endl;
+                            writeToFile(tmp);
                             std::string message = addToString(tmp);
                             send(sock, message.c_str(), strlen(message.c_str()), 0);
                         }
@@ -481,6 +487,7 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
                     else if(tokens[0].compare("SEND_MSG") == 0){
                         std::string newMsg = "Message from: " + tokens[1] + "\nMessage: " + tokens[3] + "\n";
                         myMessages.push_back(newMsg);
+                        writeToFile(newMsg);
                     } 
                     else if(tokens[0].compare("STATUSREQ") == 0){
                         std::string statusresp = "STATUSRESP,";
@@ -489,26 +496,26 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
                         {
                             statusresp += pair.second->groupName + "," + std::to_string(pair.second->messages.size()) + ",";
                         }
-
+                        std::cout << "OUT: " << statusresp << std::endl;
                         statusresp = addToString(statusresp);
                         send(sock, statusresp.c_str(), strlen(statusresp.c_str()), 0);
                     }
-                    else if(tokens[0].compare("LEAVE"))
+                    else if(tokens[0].compare("LEAVE") == 0)
                     {
-                        closeClient(sock, &open_set);
+                        closeServer(sock, &open_set);
                         close(sock);
                     }  
-                    else{
-                        std::string sorry = "SEND_MSG,P3_GROUP_2," + servers[sock]->groupName + ",An error has occured with command " + tokens[0]  +". Please try again.";
-                        sorry = addToString(sorry);
-                        send(sock, sorry.c_str(), strlen(sorry.c_str()), 0);
-                    }
-                }
-                    
-            } else {
-                closeServer(sock, &open_set);
-                close(sock);
+
+                }  
+            } 
+            else
+            {
+                isActive = false;
             }
+        }
+        if(!isActive)
+        {
+            closeServer(sock, &open_set);
         }
     }
 }
@@ -526,13 +533,12 @@ void keepAlive(fd_set* open_set)
         std::this_thread::sleep_for(std::chrono::seconds(60));
         for (auto const &c : servers)
         {
-            
             std::chrono::high_resolution_clock::time_point lastActive = c.second->lastActive;
             std::chrono::high_resolution_clock::time_point timeNow = std::chrono::system_clock::now();
             std::chrono::duration<double> diff = timeNow-lastActive;
             std::cout << diff.count();
             if(diff.count() > 120){
-                std::cout << "we are kicking: " << c.second->groupName;
+                std::cout << "KICK: " << c.second->groupName;
                 LEAVE(c.first, open_set);
                 
             }
@@ -549,7 +555,6 @@ int main(int argc, char *argv[])
     bool finished;
     int clientSock, serverSock;
     fd_set openSockets, readSockets;
-    char buffer[1025]; // buffer for reading from clients
 
     if (argc != 2)
     {
@@ -585,7 +590,6 @@ int main(int argc, char *argv[])
     {
         // Get modifiable copy of readSockets
         readSockets = openSockets;
-        memset(buffer, 0, sizeof(buffer));
 
         if (select(FD_SETSIZE, &readSockets, NULL, 0, NULL) < 0)
         {
@@ -598,11 +602,10 @@ int main(int argc, char *argv[])
             newClientConnection(clientSock, openSockets, readSockets);
             //Handle new connection from server
             newServerConnection(serverSock, openSockets, readSockets);
-            //Handle command from connected clients
-            handleClientCommand(openSockets, readSockets);
             //Handle command from connected servers
             handleServerCommand(openSockets, readSockets);  
-            
+            //Handle command from connected clients
+            handleClientCommand(openSockets, readSockets);
         }
         
         
