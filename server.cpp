@@ -405,6 +405,7 @@ void handleClientCommand(fd_set &open, fd_set &read)
                         str += cl->groupName + "," + cl->ip + "," + cl->port + ";";
                     }
                     send(sock, str.c_str(), strlen(str.c_str()), 0);
+                    
                 }
             } 
             else {
@@ -414,6 +415,19 @@ void handleClientCommand(fd_set &open, fd_set &read)
         }
     }
     
+}
+std::vector<std::string> splitAndSnitize(std::string buf){
+    std::vector<std::string> ret;
+    int lastStart = 0;
+    for(int i = 0; i < buf.size(); i++) {
+        if(buf[i] == '\4') {
+            ret.push_back(buf.substr(lastStart + 1,i - 1));
+            lastStart = i+1;
+           
+        }
+    }
+    
+    return ret;
 }
 void handleServerCommand(fd_set &open_set, fd_set &read_set)
 {
@@ -427,65 +441,70 @@ void handleServerCommand(fd_set &open_set, fd_set &read_set)
         {
             memset(buf, 0, sizeof(buf));
             n = read(sock,buf,sizeof(buf));
+
             if (n >= 0)
             {
-                servers[sock]->lastActive = std::chrono::system_clock::now();
-                std::string clean = sanitizeMsg(buf);
-                std::vector<std::string> tokens = splitBuffer(clean);
-                std::cout << std::endl << "IN: " << clean << std::endl;
-                if (tokens[0].compare("LISTSERVERS") == 0)
+                std::vector<std::string> commands = splitAndSnitize(buf);
+                for(const auto& cmd: commands)
                 {
-                    servers[sock]->groupName = tokens[1];
-                    std::string sendStr = LISTSERVERS(sock);
-                    strcpy(msg, addToString( sendStr ).c_str() );
-                    std::cout << "OUT: " << msg << std::endl;
-                    send(sock, msg, strlen(msg), 0);
-                }
-                else if(tokens[0].compare("GET_MSG") == 0)
-                {
-                    if(servers[sock]->messages.size() > 0)
+                    servers[sock]->lastActive = std::chrono::system_clock::now();
+                    //std::string clean = sanitizeMsg(buf);
+                    std::vector<std::string> tokens = splitBuffer(cmd);
+                    std::cout << std::endl << "IN: " << cmd << std::endl;
+                    if (tokens[0].compare("LISTSERVERS") == 0)
                     {
-                        std::string tmp = "SEND_MSG,P3_GROUP_2," + servers[sock]->groupName + "," + servers[sock]->messages.back();
-                        servers[sock]->messages.pop_back();
-                        std::cout << "OUT: " << tmp << std::endl;
-                        std::string message = addToString(tmp);
-                        send(sock, message.c_str(), strlen(message.c_str()), 0);
+                        servers[sock]->groupName = tokens[1];
+                        std::string sendStr = LISTSERVERS(sock);
+                        strcpy(msg, addToString( sendStr ).c_str() );
+                        std::cout << "OUT: " << msg << std::endl;
+                        send(sock, msg, strlen(msg), 0);
+                    }
+                    else if(tokens[0].compare("GET_MSG") == 0)
+                    {
+                        if(servers[sock]->messages.size() > 0)
+                        {
+                            std::string tmp = "SEND_MSG,P3_GROUP_2," + servers[sock]->groupName + "," + servers[sock]->messages.back();
+                            servers[sock]->messages.pop_back();
+                            std::cout << "OUT: " << tmp << std::endl;
+                            std::string message = addToString(tmp);
+                            send(sock, message.c_str(), strlen(message.c_str()), 0);
+                        }
+                    }
+                    else if(tokens[0].compare("KEEPALIVE") == 0){
+                        
+                        if(stoi(tokens[1]) > 0){
+                            std::string getMSG = "GET_MSG,P3_GROUP_2"; 
+                            getMSG = addToString(getMSG);
+                            send(sock, getMSG.c_str(),strlen(getMSG.c_str()), 0);
+                        }
+                    }   
+                    else if(tokens[0].compare("SEND_MSG") == 0){
+                        std::string newMsg = "Message from: " + tokens[1] + "\nMessage: " + tokens[3] + "\n";
+                        myMessages.push_back(newMsg);
+                    } 
+                    else if(tokens[0].compare("STATUSREQ") == 0){
+                        std::string statusresp = "STATUSRESP,";
+
+                        for(const auto& pair: servers)
+                        {
+                            statusresp += pair.second->groupName + "," + std::to_string(pair.second->messages.size()) + ",";
+                        }
+
+                        statusresp = addToString(statusresp);
+                        send(sock, statusresp.c_str(), strlen(statusresp.c_str()), 0);
+                    }
+                    else if(tokens[0].compare("LEAVE"))
+                    {
+                        closeClient(sock, &open_set);
+                        close(sock);
+                    }  
+                    else{
+                        std::string sorry = "SEND_MSG,P3_GROUP_2," + servers[sock]->groupName + ",An error has occured with command " + tokens[0]  +". Please try again.";
+                        sorry = addToString(sorry);
+                        send(sock, sorry.c_str(), strlen(sorry.c_str()), 0);
                     }
                 }
-                else if(tokens[0].compare("KEEPALIVE") == 0){
                     
-                    if(stoi(tokens[1]) > 0){
-                        std::string getMSG = "GET_MSG,P3_GROUP_2"; 
-                        getMSG = addToString(getMSG);
-                        send(sock, getMSG.c_str(),strlen(getMSG.c_str()), 0);
-                    }
-                }   
-                else if(tokens[0].compare("SEND_MSG") == 0){
-                    std::string newMsg = "Message from: " + tokens[1] + "\nMessage: " + tokens[3] + "\n";
-                    myMessages.push_back(newMsg);
-                } 
-                else if(tokens[0].compare("STATUSREQ") == 0){
-                    std::string statusresp = "STATUSRESP,";
-
-                    for(const auto& pair: servers)
-                    {
-                        statusresp += pair.second->groupName + "," + std::to_string(pair.second->messages.size()) + ",";
-                    }
-
-                    statusresp = addToString(statusresp);
-                    send(sock, statusresp.c_str(), strlen(statusresp.c_str()), 0);
-                }
-                else if(tokens[0].compare("LEAVE"))
-                {
-                    closeClient(sock, &open_set);
-                    close(sock);
-                }  
-                else{
-                    std::string sorry = "SEND_MSG,P3_GROUP_2," + servers[sock]->groupName + ",An error has occured with command " + tokens[0]  +". Please try again.";
-                    sorry = addToString(sorry);
-                    send(sock, sorry.c_str(), strlen(sorry.c_str()), 0);
-                }
-                
             } else {
                 closeServer(sock, &open_set);
                 close(sock);
