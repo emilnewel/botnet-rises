@@ -5,6 +5,7 @@ Authors: Arnór Erling, Emil Newel.
 
 OS:
     Works on macos, ubuntu and skel
+    
 Compile:
     When compiling run make in the same folder as the code.
 -----------------------------------------------------------------
